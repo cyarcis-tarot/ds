@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>강릉시 아파트 거래 대시보드</title>
+    <style>
+      :root {
+        --ink: #202020;
+        --muted: #6b665f;
+        --line: #d7cdbf;
+        --paper: #fbfaf8;
+        --teal: #5bc8c2;
+        --rose: #f07f7f;
+        --gold: #f1c76d;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        background: #f4f1ec;
+        color: var(--ink);
+        font-family: "Pretendard", "Segoe UI", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+      }
+
+      main {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 28px 18px 48px;
+      }
+
+      .hero {
+        padding: 34px;
+        border: 1px solid var(--line);
+        border-top: 12px solid #242424;
+        background: var(--paper);
+      }
+
+      .eyebrow {
+        margin: 0 0 10px;
+        color: #9b8460;
+        font-size: 13px;
+        font-weight: 900;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(34px, 6vw, 58px);
+        line-height: 1.08;
+        letter-spacing: 0;
+      }
+
+      .subtitle {
+        max-width: 760px;
+        margin: 18px 0 0;
+        color: #444;
+        font-size: 18px;
+        line-height: 1.7;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 14px;
+        margin-top: 16px;
+      }
+
+      .card {
+        min-height: 132px;
+        padding: 18px;
+        border: 1px solid var(--line);
+        background: #fff;
+      }
+
+      .card strong {
+        display: block;
+        margin-top: 8px;
+        font-size: 28px;
+      }
+
+      .card span {
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 900;
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 22px;
+      }
+
+      a, button {
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 16px;
+        border: 1px solid #242424;
+        border-radius: 4px;
+        background: #242424;
+        color: #fff;
+        text-decoration: none;
+        font-size: 15px;
+        font-weight: 900;
+      }
+
+      a.secondary {
+        border-color: var(--line);
+        background: #fff;
+        color: var(--ink);
+      }
+
+      .notice {
+        margin-top: 16px;
+        padding: 18px;
+        border: 1px solid var(--line);
+        border-left: 6px solid var(--teal);
+        background: #fff;
+        line-height: 1.7;
+      }
+
+      .notice b { color: #876d2b; }
+
+      .bars {
+        display: grid;
+        gap: 10px;
+        margin-top: 16px;
+        padding: 18px;
+        border: 1px solid var(--line);
+        background: #fff;
+      }
+
+      .bar {
+        display: grid;
+        grid-template-columns: 72px 1fr 64px;
+        gap: 10px;
+        align-items: center;
+        color: #555;
+        font-weight: 800;
+      }
+
+      .track {
+        height: 12px;
+        background: #eee8df;
+      }
+
+      .fill {
+        height: 100%;
+        background: var(--teal);
+      }
+
+      .bar:nth-child(2) .fill { background: var(--rose); }
+      .bar:nth-child(3) .fill { background: var(--gold); }
+
+      footer {
+        margin-top: 20px;
+        color: #777;
+        font-size: 13px;
+        line-height: 1.6;
+      }
+
+      @media (max-width: 760px) {
+        .grid { grid-template-columns: 1fr; }
+        .hero { padding: 24px; }
+        .bar { grid-template-columns: 56px 1fr 52px; }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="hero">
+        <p class="eyebrow">Gangneung Real Estate Pulse</p>
+        <h1>강릉시 아파트 거래 대시보드</h1>
+        <p class="subtitle">
+          공공데이터포털 실거래 API와 VWorld 주소 좌표를 연결해 강릉시 아파트 매매, 전세, 월세 흐름과 단지별 입지 경쟁력을 보는 대시보드입니다.
+        </p>
+        <div class="actions">
+          <a href="http://localhost:5177/">로컬 대시보드 열기</a>
+          <a class="secondary" href="./README.md">실행 안내 보기</a>
+        </div>
+      </section>
+
+      <section class="grid" aria-label="대시보드 주요 기능">
+        <article class="card">
+          <span>기간 필터</span>
+          <strong>일·주·월·년</strong>
+        </article>
+        <article class="card">
+          <span>거래 유형</span>
+          <strong>매매·전세·월세</strong>
+        </article>
+        <article class="card">
+          <span>입지 분석</span>
+          <strong>지도·주소·반경</strong>
+        </article>
+      </section>
+
+      <section class="bars" aria-label="예시 분석 축">
+        <div class="bar">
+          <span>거래량</span>
+          <div class="track"><div class="fill" style="width: 82%"></div></div>
+          <b>Top10</b>
+        </div>
+        <div class="bar">
+          <span>가격</span>
+          <div class="track"><div class="fill" style="width: 64%"></div></div>
+          <b>추세</b>
+        </div>
+        <div class="bar">
+          <span>입지</span>
+          <div class="track"><div class="fill" style="width: 76%"></div></div>
+          <b>반경</b>
+        </div>
+      </section>
+
+      <section class="notice">
+        <b>GitHub Pages 안내:</b>
+        이 파일은 깃허브에서 프로젝트 소개와 실행 버튼이 보이도록 만든 공개용 첫 화면입니다.
+        실제 공공데이터 API키는 보안상 브라우저용 HTML에 넣지 않습니다.
+        정확한 실거래 데이터 조회는 같은 폴더의 배포 실행파일 또는 로컬 서버 실행 후
+        <b>http://localhost:5177/</b>에서 확인합니다.
+      </section>
+
+      <footer>
+        공개 저장소에는 `.env` 파일과 API키를 올리지 마세요. 실제 대시보드 본체는 `index.html`, `styles.css`, `app.js`, `server.js` 조합으로 실행됩니다.
+      </footer>
+    </main>
+  </body>
+</html>
