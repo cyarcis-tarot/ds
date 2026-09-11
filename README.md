@@ -12,6 +12,7 @@
 기존 단순 실행은 `run-dashboard.bat`을 사용할 수 있습니다.
 
 공공데이터포털 HTTPS 인증서 검증을 위해 실행 파일은 Node.js의 `--use-system-ca` 옵션을 자동 적용합니다.
+직접 서버를 실행할 때는 같은 이유로 `node --use-system-ca server.js`를 권장합니다.
 
 배포용 포터블 실행은 `dist/Gangneung_Dashboard_Portable/Gangneung_Apartment_Dashboard.exe`를 사용합니다.
 
@@ -27,5 +28,6 @@
 ## 데이터
 
 강릉시 법정 시군구 코드 `51150`으로 국토교통부 아파트 매매 및 전월세 실거래가 API를 조회합니다.
+연결 상태는 `http://localhost:5177/api/health`에서 확인할 수 있고, 실제 외부 호출까지 점검하려면 `http://localhost:5177/api/health?probe=1`을 사용합니다.
 
 입지 거리 항목은 실제 좌표 API가 연결되기 전까지 단지명 기반 추정값으로 표시됩니다. 시장분석 지표 중 미분양, 입주량, PIR, 신용갭처럼 외부 원자료가 필요한 항목은 대시보드에서 별도 표시합니다.

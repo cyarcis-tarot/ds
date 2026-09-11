@@ -31,6 +31,7 @@ const endpoints = {
 const transactionCache = new Map();
 const monthCache = new Map();
 const geocodeCache = new Map();
+const facilityCache = new Map();
 const CACHE_MS = 1000 * 60 * 20;
 const FETCH_TIMEOUT_MS = 9000;
 
@@ -43,12 +44,20 @@ const server = http.createServer(async (req, res) => {
     }
 
     const url = new URL(req.url, `http://${req.headers.host}`);
+    if (url.pathname === "/api/health") {
+      await handleHealth(url, res);
+      return;
+    }
     if (url.pathname === "/api/transactions") {
       await handleTransactions(url, res);
       return;
     }
     if (url.pathname === "/api/geocode") {
       await handleGeocode(url, res);
+      return;
+    }
+    if (url.pathname === "/api/facilities") {
+      await handleFacilities(url, res);
       return;
     }
     serveStatic(url.pathname, res);
@@ -60,6 +69,38 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, () => {
   console.log(`Gangneung dashboard running at http://localhost:${PORT}`);
 });
+
+async function handleHealth(url, res) {
+  const probe = url.searchParams.get("probe") === "1";
+  const payload = {
+    generatedAt: new Date().toISOString(),
+    region: { name: "강릉시", lawdCd: LAWD_CD },
+    providers: {
+      transactions: {
+        name: "국토교통부 아파트 실거래가",
+        configured: Boolean(API_KEY),
+        endpoints: {
+          sale: endpoints.sale.map(endpointLabel),
+          rent: endpoints.rent.map(endpointLabel),
+        },
+      },
+      geocode: {
+        name: "VWorld 주소 좌표 변환",
+        configured: Boolean(VWORLD_API_KEY),
+      },
+    },
+  };
+
+  if (probe && API_KEY) {
+    payload.providers.transactions.probe = await probeTransactions();
+  }
+
+  if (probe && VWORLD_API_KEY) {
+    payload.providers.geocode.probe = await probeGeocode();
+  }
+
+  sendJson(res, 200, payload);
+}
 
 async function handleTransactions(url, res) {
   if (!API_KEY) {
@@ -228,6 +269,70 @@ async function handleGeocode(url, res) {
   sendJson(res, 404, { error: "브이월드에서 주소 좌표를 찾지 못했습니다.", tried: candidates, warnings });
 }
 
+async function handleFacilities(url, res) {
+  if (!VWORLD_API_KEY) {
+    sendJson(res, 500, { error: ".env.local 파일에 VWORLD_API_KEY를 설정해 주세요." });
+    return;
+  }
+
+  const lat = Number(url.searchParams.get("lat"));
+  const lng = Number(url.searchParams.get("lng"));
+  const radius = clamp(Number(url.searchParams.get("radius") || 2500), 500, 5000);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    sendJson(res, 400, { error: "시설 검색 기준 좌표가 필요합니다." });
+    return;
+  }
+
+  const cacheKey = `${lat.toFixed(6)},${lng.toFixed(6)},${radius}`;
+  const cached = getFreshCache(facilityCache, cacheKey);
+  if (cached) {
+    sendJson(res, 200, { ...cached, cached: true });
+    return;
+  }
+
+  const categories = [
+    { key: "school", label: "학교", queries: ["초등학교", "중학교", "고등학교", "학교"] },
+    { key: "transport", label: "교통", queries: ["강릉역", "강릉고속버스터미널", "강릉시외버스터미널"] },
+    { key: "commerce", label: "상권", queries: ["시장", "마트", "편의점"] },
+    { key: "medical", label: "의료", queries: ["병원", "의원"] },
+    { key: "park", label: "공원", queries: ["공원"] },
+  ];
+
+  const results = [];
+  const warnings = [];
+  for (const category of categories) {
+    const places = [];
+    for (const query of category.queries) {
+      try {
+        places.push(...await fetchVworldPlaces(query, lat, lng, radius));
+      } catch (error) {
+        warnings.push(`${category.label}:${query}:${error.message}`);
+      }
+    }
+
+    const nearest = uniquePlaces(places)
+      .map((place) => ({ ...place, distanceM: Math.round(haversineMeters(lat, lng, place.lat, place.lng)) }))
+      .filter((place) => place.distanceM <= radius)
+      .sort((a, b) => a.distanceM - b.distanceM)
+      .slice(0, 3);
+
+    if (nearest.length) {
+      results.push({ key: category.key, label: category.label, places: nearest });
+    }
+  }
+
+  const payload = {
+    provider: "VWorld",
+    generatedAt: new Date().toISOString(),
+    center: { lat, lng },
+    radiusM: radius,
+    categories: results,
+    warnings: warnings.slice(0, 8),
+  };
+  facilityCache.set(cacheKey, { time: Date.now(), data: payload });
+  sendJson(res, 200, payload);
+}
+
 async function runWithConcurrency(items, limit, worker) {
   const results = new Array(items.length);
   let index = 0;
@@ -296,6 +401,60 @@ async function fetchVworldCoord(address, type) {
   };
 }
 
+async function fetchVworldPlaces(query, lat, lng, radiusM) {
+  const delta = radiusM / 111320;
+  const lngDelta = radiusM / (111320 * Math.max(0.2, Math.cos(lat * Math.PI / 180)));
+  const url = new URL("https://api.vworld.kr/req/search");
+  url.searchParams.set("service", "search");
+  url.searchParams.set("request", "search");
+  url.searchParams.set("version", "2.0");
+  url.searchParams.set("crs", "EPSG:4326");
+  url.searchParams.set("query", query);
+  url.searchParams.set("type", "place");
+  url.searchParams.set("format", "json");
+  url.searchParams.set("size", "10");
+  url.searchParams.set("page", "1");
+  url.searchParams.set("bbox", [
+    lng - lngDelta,
+    lat - delta,
+    lng + lngDelta,
+    lat + delta,
+  ].map((value) => value.toFixed(7)).join(","));
+  url.searchParams.set("key", VWORLD_API_KEY);
+
+  const { response, text } = await fetchTextWithTimeout(url, FETCH_TIMEOUT_MS);
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new Error(stripTags(text).slice(0, 120) || "JSON 파싱 실패");
+  }
+
+  const body = data.response || {};
+  if (body.status !== "OK") {
+    if (body.status === "NOT_FOUND") return [];
+    const detail = body.error?.text || body.status || "NOT_FOUND";
+    throw new Error(String(detail).slice(0, 120));
+  }
+
+  const items = Array.isArray(body.result?.items) ? body.result.items : [];
+  return items.map((item) => {
+    const point = item.point || {};
+    const placeLat = Number(point.y);
+    const placeLng = Number(point.x);
+    if (!Number.isFinite(placeLat) || !Number.isFinite(placeLng)) return null;
+    return {
+      name: tidy(stripTags(item.title || item.name || query)),
+      address: tidy(stripTags(item.address?.road || item.address?.parcel || item.address || "")),
+      lat: placeLat,
+      lng: placeLng,
+      sourceQuery: query,
+    };
+  }).filter(Boolean);
+}
+
 async function fetchTextWithTimeout(url, timeoutMs) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -307,10 +466,38 @@ async function fetchTextWithTimeout(url, timeoutMs) {
     if (error.name === "AbortError") {
       throw new Error(`응답 지연 ${Math.round(timeoutMs / 1000)}초 초과`);
     }
-    throw new Error(error.message || "fetch failed");
+    throw new Error(summarizeFetchError(error));
   } finally {
     clearTimeout(timer);
   }
+}
+
+async function probeTransactions() {
+  const month = lastMonths(1)[0];
+  try {
+    await fetchMonthFromEndpoint("sale", month, endpoints.sale[0]);
+    return { ok: true, checkedMonth: month };
+  } catch (error) {
+    return { ok: false, checkedMonth: month, error: error.message };
+  }
+}
+
+async function probeGeocode() {
+  try {
+    const result = await fetchVworldCoord("강원특별자치도 강릉시청", "road");
+    return { ok: true, lat: result.lat, lng: result.lng };
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
+}
+
+function summarizeFetchError(error) {
+  const parts = [error.message || "fetch failed"];
+  const cause = error.cause || {};
+  if (cause.code) parts.push(cause.code);
+  if (cause.reason) parts.push(cause.reason);
+  if (cause.message && cause.message !== error.message) parts.push(cause.message);
+  return [...new Set(parts.filter(Boolean))].join(" · ").slice(0, 160);
 }
 
 function endpointLabel(endpoint) {
@@ -333,7 +520,8 @@ function parseRtmsXml(xml) {
 }
 
 function serveStatic(requestPath, res) {
-  const safePath = requestPath === "/" ? "/index.html" : decodeURIComponent(requestPath);
+  let safePath = requestPath === "/" ? "/dashboard.html" : decodeURIComponent(requestPath);
+  if (safePath === "/public") safePath = "/index.html";
   const filePath = path.normalize(path.join(ROOT, safePath));
   if (!filePath.startsWith(ROOT)) {
     res.writeHead(403);
@@ -352,11 +540,13 @@ function serveStatic(requestPath, res) {
 }
 
 function loadEnv() {
-  const envPath = path.join(__dirname, ".env");
-  if (!fs.existsSync(envPath)) return;
-  for (const line of fs.readFileSync(envPath, "utf8").split(/\r?\n/)) {
-    const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)\s*$/);
-    if (match && !process.env[match[1]]) process.env[match[1]] = match[2].replace(/^["']|["']$/g, "");
+  for (const fileName of [".env.local", ".env"]) {
+    const envPath = path.join(__dirname, fileName);
+    if (!fs.existsSync(envPath)) continue;
+    for (const line of fs.readFileSync(envPath, "utf8").split(/\r?\n/)) {
+      const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)\s*$/);
+      if (match && !process.env[match[1]]) process.env[match[1]] = match[2].replace(/^["']|["']$/g, "");
+    }
   }
 }
 
@@ -407,6 +597,26 @@ function decodeXml(value) {
 
 function stripTags(value) {
   return String(value || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function uniquePlaces(places) {
+  const seen = new Set();
+  return places.filter((place) => {
+    const key = `${place.name}|${place.address}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function haversineMeters(lat1, lng1, lat2, lng2) {
+  const earthRadius = 6371000;
+  const toRad = (value) => value * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return earthRadius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 function trimRoadNumber(value) {

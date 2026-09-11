@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>강릉시 아파트 거래 대시보드</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <div>
+          <p class="eyebrow">Gangneung Real Estate Pulse</p>
+          <h1>강릉시 아파트 거래 대시보드</h1>
+          <p class="subtitle">공공데이터포털 실거래가와 VWorld 공간정보를 서버에서 연결해 매매, 전세, 월세 흐름과 선택 단지의 실제 입지 거리를 확인합니다.</p>
+        </div>
+        <div class="hero-actions">
+          <button id="refreshBtn" class="primary">데이터 새로고침</button>
+          <button id="printBtn" class="ghost">인쇄</button>
+        </div>
+      </section>
+
+      <section class="controls">
+        <label>
+          기간
+          <select id="periodSelect">
+            <option value="daily">일간</option>
+            <option value="weekly">주간</option>
+            <option value="monthly" selected>월간</option>
+            <option value="yearly">년간</option>
+          </select>
+        </label>
+        <label>
+          동 검색
+          <select id="dongSelect">
+            <option value="all">강릉시 전체</option>
+          </select>
+        </label>
+        <label>
+          비교할 아파트
+          <select id="aptSelect">
+            <option value="">단지 선택</option>
+          </select>
+        </label>
+        <div id="filterMeta" class="filter-meta">필터 적용 대기 중</div>
+      </section>
+
+      <section class="panel source-panel">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">Data Source Status</p>
+            <h2>API 연결 상태</h2>
+          </div>
+          <span class="chip">키 값 비공개</span>
+        </div>
+        <div id="sourceStatus" class="source-status"></div>
+      </section>
+
+      <section class="grid two decision-grid top-outlook">
+        <article class="panel forecast-panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">시장 전망</p>
+              <h2>강릉시 부동산 전망</h2>
+            </div>
+            <span id="forecastBadge" class="chip">실거래 기반</span>
+          </div>
+          <div class="forecast-body">
+            <div class="score-ring" id="marketScore">-</div>
+            <div>
+              <strong id="forecastTitle" class="forecast-title">데이터 분석 중</strong>
+              <p id="forecastSummary" class="forecast-summary">공공데이터 실거래 자료를 기반으로 거래량, 가격흐름, 전월세 압력, 리스크를 계산합니다.</p>
+              <div id="signalPills" class="signal-pills"></div>
+            </div>
+          </div>
+        </article>
+
+        <article class="panel action-panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">수익 판단</p>
+              <h2>수익 가능성 판단</h2>
+            </div>
+          </div>
+          <div id="profitCards" class="profit-cards"></div>
+        </article>
+      </section>
+
+      <section class="kpis">
+        <article><span>총 거래</span><strong id="totalDeals">-</strong></article>
+        <article><span>매매</span><strong id="saleDeals">-</strong></article>
+        <article><span>전세</span><strong id="jeonseDeals">-</strong></article>
+        <article><span>월세</span><strong id="rentDeals">-</strong></article>
+      </section>
+
+      <section class="panel additional-analysis">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">추가 분석</p>
+            <h2>현재 실거래 데이터로 보는 시장 스냅샷</h2>
+          </div>
+          <span class="chip">실거래 기반</span>
+        </div>
+        <div id="additionalAnalysis" class="analysis-cards"></div>
+      </section>
+
+      <section class="panel framework-panel">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">시장분석 프레임</p>
+            <h2>부동산 빅데이터 시장분석 지표</h2>
+          </div>
+          <span class="chip">시장분석 핵심지표</span>
+        </div>
+        <div id="metricTabs" class="metric-tabs" aria-label="시장분석 지표 선택">
+          <button type="button" class="metric-tab active" data-metric="demand"><span>01</span>수요/거래</button>
+          <button type="button" class="metric-tab" data-metric="supply"><span>02</span>공급/미분양</button>
+          <button type="button" class="metric-tab" data-metric="price"><span>03</span>가격지수</button>
+          <button type="button" class="metric-tab" data-metric="sentiment"><span>04</span>매수심리</button>
+          <button type="button" class="metric-tab" data-metric="pir"><span>05</span>PIR/부담</button>
+          <button type="button" class="metric-tab" data-metric="risk"><span>06</span>신용/리스크</button>
+        </div>
+        <div id="metricInsight" class="metric-insight"></div>
+      </section>
+
+      <section class="grid two">
+        <article class="panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">거래 순위</p>
+              <h2>거래량 Top 10</h2>
+            </div>
+            <span id="rankMeta" class="chip">-</span>
+          </div>
+          <div id="topList" class="top-list"></div>
+        </article>
+        <article class="panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">거래 유형</p>
+              <h2>거래유형별 막대그래프</h2>
+            </div>
+          </div>
+          <canvas id="typeChart" class="compact-chart" height="190"></canvas>
+        </article>
+      </section>
+
+      <section class="grid two">
+        <article class="panel calendar-panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">거래 일자</p>
+              <h2>거래 달력 <span id="calendarTitle" class="inline-month"></span></h2>
+            </div>
+            <label class="panel-select">
+              기준 월
+              <select id="calendarMonthSelect"></select>
+            </label>
+          </div>
+          <div id="calendar" class="calendar"></div>
+        </article>
+        <article class="panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">단지 비교</p>
+              <h2>Top 10 vs 선택 단지</h2>
+            </div>
+          </div>
+          <canvas id="compareChart" height="260"></canvas>
+          <div id="locationScore" class="location-score"></div>
+        </article>
+      </section>
+
+      <section class="panel map-panel">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">VWorld 공간정보</p>
+            <h2>선택 아파트 위치와 주변시설</h2>
+          </div>
+          <span id="mapAptName" class="chip">단지 선택</span>
+        </div>
+        <div class="map-layout">
+          <div class="address-card">
+            <span>주소</span>
+            <strong id="mapAddress">아파트를 선택하면 주소와 지도가 표시됩니다.</strong>
+            <div id="mapLinks" class="map-links"></div>
+          </div>
+          <div class="map-canvas">
+            <iframe id="mapFrame" class="map-frame" title="선택 아파트 지도" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+            <div id="mapRadiusOverlay" class="map-radius-overlay" aria-label="입지 반경 표시"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">월별 흐름</p>
+            <h2>월별 거래 흐름</h2>
+          </div>
+          <div class="panel-actions">
+            <label class="panel-select">
+              거래 유형
+              <select id="trendTypeSelect">
+                <option value="all">전체</option>
+                <option value="매매">매매</option>
+                <option value="전세">전세</option>
+                <option value="월세">월세</option>
+              </select>
+            </label>
+            <label class="panel-select">
+              표시 기간
+              <select id="trendMonthsSelect">
+                <option value="6">최근 6개월</option>
+                <option value="12" selected>최근 12개월</option>
+                <option value="24">최근 24개월</option>
+              </select>
+            </label>
+          </div>
+        </div>
+        <canvas id="trendChart" height="240"></canvas>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">최근 거래</p>
+            <h2>선택 아파트 최근 실거래</h2>
+          </div>
+          <div class="panel-actions">
+            <label class="panel-select">
+              거래 유형
+              <select id="dealTypeSelect">
+                <option value="all">전체</option>
+                <option value="매매">매매</option>
+                <option value="전세">전세</option>
+                <option value="월세">월세</option>
+              </select>
+            </label>
+            <span id="dealTableMeta" class="chip">단지 선택</span>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>거래일</th>
+                <th>유형</th>
+                <th>아파트</th>
+                <th>전용면적</th>
+                <th>층</th>
+                <th>금액</th>
+                <th>주소</th>
+              </tr>
+            </thead>
+            <tbody id="dealTable"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <p id="status" class="status">대시보드를 준비 중입니다.</p>
+    </main>
+    <script src="./app.js"></script>
+  </body>
+</html>

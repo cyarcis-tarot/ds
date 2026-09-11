@@ -13,6 +13,12 @@ const state = {
   mapRequestId: 0,
   loadRequestId: 0,
   dataCache: new Map(),
+  apiHealth: null,
+  facilityCache: new Map(),
+  sourceStatus: {
+    transactions: { state: "checking", lastChecked: "", detail: "확인 중" },
+    geocode: { state: "checking", lastChecked: "", detail: "확인 중" },
+  },
 };
 
 const el = {
@@ -30,6 +36,7 @@ const el = {
   jeonseDeals: document.querySelector("#jeonseDeals"),
   rentDeals: document.querySelector("#rentDeals"),
   additionalAnalysis: document.querySelector("#additionalAnalysis"),
+  sourceStatus: document.querySelector("#sourceStatus"),
   forecastBadge: document.querySelector("#forecastBadge"),
   marketScore: document.querySelector("#marketScore"),
   forecastTitle: document.querySelector("#forecastTitle"),
@@ -127,6 +134,14 @@ async function loadData() {
 
   setStatus("공공데이터포털에서 강릉시 실거래가를 불러오는 중입니다.");
   try {
+    const health = await getApiHealth();
+    if (requestId !== state.loadRequestId) return;
+    const missing = getMissingProviders(health);
+    if (missing.length) {
+      throw new Error(`${missing.join(", ")} API 키가 설정되지 않았습니다.`);
+    }
+    setStatus(`${providerSummary(health)} 연결 확인. 강릉시 실거래가를 불러오는 중입니다.`);
+
     const response = await fetch(`${API_ORIGIN}/api/transactions?months=${requestedMonths}`);
     const data = await response.json();
     if (requestId !== state.loadRequestId) return;
@@ -135,6 +150,7 @@ async function loadData() {
       throw new Error(`API 응답 경고: ${data.warnings.join(", ")}`);
     }
     state.dataCache.set(requestedMonths, data);
+    updateSourceStatus("transactions", "ok", data.generatedAt, `${data.region.name} 실거래 ${format(data.rows?.length || 0)}건`);
     useTransactionData(data, false);
   } catch (error) {
     if (requestId !== state.loadRequestId) return;
@@ -144,6 +160,7 @@ async function loadData() {
     render();
     const runHint = window.location.protocol === "file:" ? " run-dashboard.bat으로 실행하면 실제 공공데이터가 표시됩니다." : "";
     setStatus(`실제 데이터를 불러오지 못했습니다: ${error.message}.${runHint}`);
+    updateSourceStatus("transactions", "error", new Date().toISOString(), error.message);
   }
 }
 
@@ -155,6 +172,61 @@ function useTransactionData(data, fromCache) {
   const warningText = data.warnings?.length ? ` 일부 월 데이터 경고 ${data.warnings.length}건.` : "";
   const cacheText = fromCache ? " 캐시 사용." : "";
   setStatus(`${data.region.name} ${getPeriodScopeLabel()} 표시 ${format(state.periodRows.length)}건, 분석용 ${format(state.rows.length)}건 로드.${cacheText}${warningText}`);
+}
+
+async function getApiHealth() {
+  if (state.apiHealth) return state.apiHealth;
+  const response = await fetch(`${API_ORIGIN}/api/health`);
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || "API 상태 확인 실패");
+  state.apiHealth = data;
+  updateSourceStatus("transactions", data.providers?.transactions?.configured ? "ready" : "error", data.generatedAt, data.providers?.transactions?.configured ? "키 설정 완료" : "키 미설정");
+  updateSourceStatus("geocode", data.providers?.geocode?.configured ? "ready" : "error", data.generatedAt, data.providers?.geocode?.configured ? "키 설정 완료" : "키 미설정");
+  return data;
+}
+
+function updateSourceStatus(key, sourceState, lastChecked, detail) {
+  state.sourceStatus[key] = { state: sourceState, lastChecked, detail };
+  renderSourceStatus();
+}
+
+function renderSourceStatus() {
+  if (!el.sourceStatus) return;
+  const items = [
+    { key: "transactions", title: "국토교통부 실거래가 / 공공데이터포털" },
+    { key: "geocode", title: "VWorld 공간정보" },
+  ];
+  el.sourceStatus.innerHTML = items.map((item) => {
+    const current = state.sourceStatus[item.key] || {};
+    const ok = current.state === "ok" || current.state === "ready";
+    const label = current.state === "error" ? "연결 오류" : (current.state === "checking" ? "확인 중" : "연결 정상");
+    return `
+      <article class="source-card ${ok ? "ok" : current.state === "error" ? "error" : ""}">
+        <span class="source-dot"></span>
+        <div>
+          <strong>${escapeHtml(item.title)}</strong>
+          <p>${escapeHtml(label)}</p>
+          <small>마지막 조회: ${escapeHtml(formatDateTime(current.lastChecked))}</small>
+          <small>${escapeHtml(current.detail || "")}</small>
+        </div>
+      </article>
+    `;
+  }).join("");
+}
+
+function getMissingProviders(health) {
+  const providers = health?.providers || {};
+  return Object.values(providers)
+    .filter((provider) => !provider.configured)
+    .map((provider) => provider.name || "외부");
+}
+
+function providerSummary(health) {
+  const providers = health?.providers || {};
+  const ready = Object.values(providers)
+    .filter((provider) => provider.configured)
+    .map((provider) => provider.name);
+  return ready.length ? ready.join(", ") : "외부 API";
 }
 
 function hydrateFilters() {
@@ -407,15 +479,11 @@ function renderDealTable() {
 
 function renderLocationScore() {
   const apt = el.aptSelect.value || state.top10[0]?.name || "";
-  const rows = state.baseRows.filter((row) => row.apartment === apt);
-  const profile = estimateLocation(apt, rows[0]?.dong || "");
-  el.locationScore.innerHTML = profile.map((item) => `
-    <div class="score">
-      <span>${item.label}</span>
-      <strong>${format(item.meters)}m</strong>
-      <small>지도 반경 ${format(item.meters)}m</small>
-    </div>
-  `).join("");
+  if (!apt) {
+    renderFacilityScores([]);
+    return;
+  }
+  renderFacilityScores([], "VWorld 좌표 확인 후 실제 주변시설 거리를 계산합니다.");
 }
 
 function renderMap() {
@@ -434,28 +502,40 @@ function renderMap() {
 
   const address = row.address || buildAddress(row);
   const query = `${address} ${apt}`;
-  const locationProfile = estimateLocation(apt, row.dong);
   el.mapAptName.textContent = apt;
-  el.mapAddress.innerHTML = `${escapeHtml(address)}<small>${escapeHtml(apt)} · ${escapeHtml(row.dong)} · 브이월드 좌표 확인 중</small>${radiusLegend(locationProfile)}`;
+  el.mapAddress.innerHTML = `${escapeHtml(address)}<small>${escapeHtml(apt)} · ${escapeHtml(row.dong)} · 브이월드 좌표 확인 중</small>`;
   el.mapFrame.src = osmEmbedSrc(37.7519, 128.8761, 0.04);
   el.mapLinks.innerHTML = mapLinks(query);
-  renderMapRadiusOverlay(locationProfile);
+  renderMapRadiusOverlay([]);
 
   getVworldCoord(row, address)
-    .then((geo) => {
+    .then(async (geo) => {
       if (requestId !== state.mapRequestId) return;
       const coordText = `${formatNumber(geo.lat, 6)}, ${formatNumber(geo.lng, 6)}`;
       const refined = geo.refinedAddress || geo.address || address;
+      updateSourceStatus("geocode", "ok", new Date().toISOString(), `좌표 ${coordText}`);
       el.mapAddress.innerHTML = `
         ${escapeHtml(refined)}
         <small>${escapeHtml(apt)} · ${escapeHtml(row.dong)} · 브이월드 ${escapeHtml(geo.type)} 좌표 ${escapeHtml(coordText)}</small>
-        ${radiusLegend(locationProfile)}
       `;
       el.mapFrame.src = osmEmbedSrc(geo.lat, geo.lng, 0.0025);
       el.mapLinks.innerHTML = mapLinks(query, geo);
+      renderFacilityScores([], "VWorld 주변시설 검색 중");
+      const facilities = await getVworldFacilities(geo);
+      if (requestId !== state.mapRequestId) return;
+      updateSourceStatus("geocode", "ok", facilities.generatedAt, `좌표 및 주변시설 ${countFacilities(facilities)}건`);
+      const profile = flattenFacilities(facilities).slice(0, 6);
+      renderFacilityScores(profile);
+      renderMapRadiusOverlay(profile);
+      el.mapAddress.innerHTML = `
+        ${escapeHtml(refined)}
+        <small>${escapeHtml(apt)} · ${escapeHtml(row.dong)} · 브이월드 좌표와 실제 주변시설 거리 계산 완료</small>
+        ${radiusLegend(profile)}
+      `;
     })
     .catch((error) => {
       if (requestId !== state.mapRequestId) return;
+      updateSourceStatus("geocode", "error", new Date().toISOString(), error.message);
       el.mapAddress.innerHTML = `
         ${escapeHtml(address)}
         <small>${escapeHtml(apt)} · ${escapeHtml(row.dong)} · 브이월드 좌표 확인 실패: ${escapeHtml(error.message)}</small>
@@ -476,6 +556,17 @@ async function getVworldCoord(row, address) {
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.error || "좌표 변환 실패");
   state.geocodeCache.set(cacheKey, data);
+  return data;
+}
+
+async function getVworldFacilities(geo) {
+  const cacheKey = `${geo.lat.toFixed(6)},${geo.lng.toFixed(6)}`;
+  if (state.facilityCache.has(cacheKey)) return state.facilityCache.get(cacheKey);
+  const params = new URLSearchParams({ lat: String(geo.lat), lng: String(geo.lng), radius: "2500" });
+  const response = await fetch(`${API_ORIGIN}/api/facilities?${params}`);
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || "주변시설 검색 실패");
+  state.facilityCache.set(cacheKey, data);
   return data;
 }
 
@@ -857,19 +948,9 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-function estimateLocation(apt, dong) {
-  const seed = [...`${apt}${dong}`].reduce((sum, char) => sum + char.charCodeAt(0), 0);
-  return [
-    { label: "역세권 추정", meters: 450 + (seed % 2200) },
-    { label: "학군/학교권", meters: 180 + (seed % 920) },
-    { label: "주민센터 접근", meters: 320 + (seed % 1800) },
-    { label: "상권 접근", meters: 140 + (seed % 1400) },
-  ];
-}
-
 function radiusLegend(profile) {
   if (!profile.length) return "";
-  return `<div class="radius-legend">${profile.map((item) => `<span>${escapeHtml(item.label)} ${format(item.meters)}m</span>`).join("")}</div>`;
+  return `<div class="radius-legend">${profile.slice(0, 4).map((item) => `<span>${escapeHtml(item.label)} ${formatDistance(item.meters)}</span>`).join("")}</div>`;
 }
 
 function renderMapRadiusOverlay(profile) {
@@ -881,10 +962,48 @@ function renderMapRadiusOverlay(profile) {
   el.mapRadiusOverlay.innerHTML = `
     <div class="radius-target"><span class="map-pin"></span>선택 단지</div>
     ${sorted.map((item, index) => {
-      const size = 104 + index * 54;
-      return `<div class="radius-circle r${index + 1}" style="width:${size}px;height:${size}px"><span>${escapeHtml(item.label)} ${format(item.meters)}m</span></div>`;
+      const size = 104 + index * 38;
+      return `<div class="radius-circle r${index + 1}" style="width:${size}px;height:${size}px"><span>${escapeHtml(item.label)} ${formatDistance(item.meters)}</span></div>`;
     }).join("")}
   `;
+}
+
+function renderFacilityScores(profile, message = "") {
+  if (!profile.length) {
+    el.locationScore.innerHTML = `
+      <div class="score empty-score">
+        <span>입지분석</span>
+        <strong>${escapeHtml(message || "단지 선택")}</strong>
+        <small>임의 거리값을 표시하지 않습니다.</small>
+      </div>
+    `;
+    return;
+  }
+
+  el.locationScore.innerHTML = profile.map((item) => `
+    <div class="score">
+      <span>${escapeHtml(item.category)}</span>
+      <strong>${escapeHtml(formatDistance(item.meters))}</strong>
+      <small>${escapeHtml(item.label)}</small>
+    </div>
+  `).join("");
+}
+
+function flattenFacilities(facilities) {
+  return (facilities.categories || []).flatMap((category) => {
+    return (category.places || []).map((place) => ({
+      category: category.label,
+      label: place.name,
+      meters: place.distanceM,
+      address: place.address,
+      lat: place.lat,
+      lng: place.lng,
+    }));
+  }).sort((a, b) => a.meters - b.meters);
+}
+
+function countFacilities(facilities) {
+  return (facilities.categories || []).reduce((sum, category) => sum + (category.places || []).length, 0);
 }
 
 function buildAddress(row) {
@@ -942,6 +1061,25 @@ function formatNumber(value, digits = 0) {
 function formatPercent(value) {
   const sign = value > 0 ? "+" : "";
   return `${sign}${formatNumber(value, 1)}%`;
+}
+
+function formatDateTime(value) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString("ko-KR", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function formatDistance(meters) {
+  const value = Number(meters || 0);
+  if (value >= 1000) return `${formatNumber(value / 1000, 1)}km`;
+  return `${format(value)}m`;
 }
 
 function formatMoney(value) {

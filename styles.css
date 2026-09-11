@@ -228,6 +228,62 @@ select {
   border-top-color: var(--yellow);
 }
 
+.source-panel {
+  margin-bottom: 14px;
+}
+
+.source-status {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.source-card {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr);
+  gap: 12px;
+  min-height: 108px;
+  padding: 14px;
+  border: 1px solid var(--line-soft);
+  background: #fff;
+}
+
+.source-dot {
+  width: 10px;
+  height: 10px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: var(--yellow);
+}
+
+.source-card.ok .source-dot {
+  background: var(--teal);
+}
+
+.source-card.error .source-dot {
+  background: var(--red);
+}
+
+.source-card strong {
+  display: block;
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+.source-card p {
+  margin: 6px 0 4px;
+  color: var(--ink);
+  font-weight: 900;
+}
+
+.source-card small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .panel {
   padding: 18px;
 }
@@ -591,6 +647,10 @@ canvas {
   margin-top: 12px;
 }
 
+.location-score .empty-score {
+  grid-column: 1 / -1;
+}
+
 .score strong {
   display: block;
   margin-top: 5px;
@@ -828,7 +888,7 @@ tbody tr:nth-child(even) {
 
 @media (max-width: 920px) {
   .hero, .panel-head { align-items: flex-start; flex-direction: column; }
-  .kpis, .grid.two, .location-score, .map-layout, .forecast-body, .profit-cards, .metric-insight { grid-template-columns: 1fr; }
+  .kpis, .grid.two, .source-status, .location-score, .map-layout, .forecast-body, .profit-cards, .metric-insight { grid-template-columns: 1fr; }
   .metric-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .analysis-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .controls label { min-width: min(100%, 240px); flex: 1; }
