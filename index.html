@@ -4,265 +4,432 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>강릉시 아파트 거래 대시보드</title>
-    <link rel="stylesheet" href="./styles.css" />
+    <style>
+      :root {
+        --ink: #202020;
+        --text: #2f3135;
+        --muted: #6d6860;
+        --paper: #fbfaf7;
+        --line: #d8cdbc;
+        --tan: #ad9c83;
+        --teal: #5fc9c3;
+        --red: #f17474;
+        --gold: #efc65f;
+        --blue: #6f87e8;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        background: #f3f0eb;
+        color: var(--text);
+        font-family: "Pretendard", "Segoe UI", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+      }
+
+      .topbar {
+        background: var(--ink);
+        color: #fff;
+        border-bottom: 10px solid var(--tan);
+      }
+
+      .topbar-inner {
+        max-width: 1160px;
+        margin: 0 auto;
+        padding: 34px 24px 30px;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(34px, 5vw, 58px);
+        line-height: 1.08;
+        letter-spacing: 0;
+      }
+
+      .subtitle {
+        max-width: 760px;
+        margin: 18px 0 0;
+        color: #f2f0eb;
+        font-size: 18px;
+        line-height: 1.7;
+      }
+
+      main {
+        max-width: 1160px;
+        margin: 0 auto;
+        padding: 24px;
+      }
+
+      section {
+        margin-top: 18px;
+        border: 1px solid var(--line);
+        background: var(--paper);
+      }
+
+      .section-head {
+        padding: 24px 24px 16px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .label {
+        color: #9b8460;
+        font-size: 14px;
+        font-weight: 800;
+      }
+
+      h2 {
+        margin: 8px 0 0;
+        color: #111827;
+        font-size: clamp(26px, 4vw, 40px);
+        line-height: 1.2;
+        letter-spacing: 0;
+      }
+
+      .overview {
+        display: grid;
+        grid-template-columns: 1.1fr 0.9fr;
+        gap: 18px;
+        align-items: stretch;
+      }
+
+      .intro { padding: 24px; }
+
+      .intro p {
+        margin: 0;
+        font-size: 18px;
+        line-height: 1.75;
+      }
+
+      .status-card {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+        padding: 24px;
+      }
+
+      .metric,
+      .feature,
+      .step,
+      .notice {
+        padding: 18px;
+        border: 1px solid var(--line);
+        background: #fff;
+      }
+
+      .metric { min-height: 124px; }
+      .metric:nth-child(1) { border-top: 5px solid var(--teal); }
+      .metric:nth-child(2) { border-top: 5px solid var(--gold); }
+      .metric:nth-child(3) { border-top: 5px solid var(--red); }
+      .metric:nth-child(4) { border-top: 5px solid var(--blue); }
+
+      .metric span {
+        display: block;
+        color: var(--muted);
+        font-size: 15px;
+        font-weight: 800;
+      }
+
+      .metric strong {
+        display: block;
+        margin-top: 12px;
+        color: #111827;
+        font-size: 30px;
+        line-height: 1.1;
+      }
+
+      .metric small {
+        display: block;
+        margin-top: 10px;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.5;
+      }
+
+      .feature-grid,
+      .steps,
+      .notice-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+        padding: 24px;
+      }
+
+      .feature,
+      .step,
+      .notice {
+        min-height: 128px;
+      }
+
+      .num {
+        display: inline-flex;
+        width: 30px;
+        height: 30px;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 12px;
+        border-radius: 50%;
+        background: var(--tan);
+        color: #fff;
+        font-weight: 900;
+      }
+
+      h3 {
+        margin: 0 0 10px;
+        color: #111827;
+        font-size: 20px;
+        line-height: 1.35;
+      }
+
+      p {
+        margin: 0;
+        color: #4b4b4b;
+        font-size: 15px;
+        line-height: 1.65;
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        padding: 0 24px 24px;
+      }
+
+      .button {
+        display: inline-flex;
+        min-height: 46px;
+        align-items: center;
+        justify-content: center;
+        padding: 0 18px;
+        border: 1px solid #9b8b74;
+        border-radius: 6px;
+        background: #fff;
+        color: #251f17;
+        font-weight: 900;
+        text-decoration: none;
+      }
+
+      .button.primary {
+        border-color: var(--teal);
+        background: var(--teal);
+        color: #07302f;
+      }
+
+      .chart {
+        height: 220px;
+        margin: 24px;
+        padding: 20px;
+        border: 1px solid var(--line);
+        background:
+          linear-gradient(to top, rgba(216, 205, 188, 0.45) 1px, transparent 1px) 0 0 / 100% 44px,
+          #fff;
+      }
+
+      .bars {
+        display: grid;
+        height: 100%;
+        grid-template-columns: repeat(12, 1fr);
+        gap: 12px;
+        align-items: end;
+      }
+
+      .bar {
+        min-height: 22px;
+        border-radius: 4px 4px 0 0;
+        background: var(--teal);
+      }
+
+      .bar:nth-child(3n + 1) { background: var(--teal); }
+      .bar:nth-child(3n + 2) { background: var(--red); }
+      .bar:nth-child(3n) { background: var(--gold); }
+
+      .footer {
+        max-width: 1160px;
+        margin: 18px auto 34px;
+        padding: 0 24px;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.6;
+      }
+
+      code {
+        padding: 2px 6px;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        background: #fff;
+        color: #111827;
+        font-family: "Consolas", "D2Coding", monospace;
+      }
+
+      @media (max-width: 820px) {
+        .overview,
+        .feature-grid,
+        .steps,
+        .notice-grid,
+        .status-card {
+          grid-template-columns: 1fr;
+        }
+
+        main,
+        .topbar-inner,
+        .footer {
+          padding-left: 16px;
+          padding-right: 16px;
+        }
+      }
+    </style>
   </head>
   <body>
-    <main class="shell">
-      <section class="hero">
-        <div>
-          <p class="eyebrow">Gangneung Real Estate Pulse</p>
-          <h1>강릉시 아파트 거래 대시보드</h1>
-          <p class="subtitle">매매, 전세, 월세 거래량을 일간·주간·월간 기준으로 비교하고 선택 단지의 입지 경쟁력을 한 화면에서 확인합니다.</p>
+    <header class="topbar">
+      <div class="topbar-inner">
+        <h1>강릉시 아파트 거래 대시보드</h1>
+        <p class="subtitle">
+          매매, 전세, 월세 실거래와 단지 위치, 기간별 흐름을 한 화면에서 확인하는 강릉시 부동산 전망 분석 화면입니다.
+        </p>
+      </div>
+    </header>
+
+    <main>
+      <section class="overview">
+        <div class="intro">
+          <div class="label">GitHub Pages 공개용</div>
+          <h2>최종 공개 인덱스</h2>
+          <p>
+            이 페이지는 GitHub에서 바로 열리도록 만든 안내용 첫 화면입니다. 실제 자동 조회, 지도 표시, 단지 선택, 일간/주간/월간/년간
+            집계는 사용자 PC의 로컬 실행파일과 서버에서 작동합니다.
+          </p>
         </div>
-        <div class="hero-actions">
-          <button id="refreshBtn" class="primary">데이터 새로고침</button>
-          <button id="printBtn" class="ghost">인쇄</button>
-        </div>
-      </section>
-
-      <section class="controls">
-        <label>
-          기간
-          <select id="periodSelect">
-            <option value="daily">일간</option>
-            <option value="weekly">주간</option>
-            <option value="monthly" selected>월간</option>
-            <option value="yearly">년간</option>
-          </select>
-        </label>
-        <label>
-          동 검색
-          <select id="dongSelect">
-            <option value="all">강릉시 전체</option>
-          </select>
-        </label>
-        <label>
-          비교할 아파트
-          <select id="aptSelect">
-            <option value="">단지 선택</option>
-          </select>
-        </label>
-        <div id="filterMeta" class="filter-meta">필터 적용 대기 중</div>
-      </section>
-
-      <section class="grid two decision-grid top-outlook">
-        <article class="panel forecast-panel">
-          <div class="panel-head">
-            <div>
-              <p class="eyebrow">시장 전망</p>
-              <h2>강릉시 부동산 전망</h2>
-            </div>
-            <span id="forecastBadge" class="chip">실거래 기반</span>
+        <div class="status-card">
+          <div class="metric">
+            <span>데이터 기준</span>
+            <strong>공공데이터</strong>
+            <small>국토교통부 실거래 API 기반</small>
           </div>
-          <div class="forecast-body">
-            <div class="score-ring" id="marketScore">-</div>
-            <div>
-              <strong id="forecastTitle" class="forecast-title">데이터 분석 중</strong>
-              <p id="forecastSummary" class="forecast-summary">공공데이터 실거래 자료를 기반으로 거래량, 가격흐름, 전월세 압력, 리스크를 계산합니다.</p>
-              <div id="signalPills" class="signal-pills"></div>
-            </div>
+          <div class="metric">
+            <span>지도 기준</span>
+            <strong>VWorld</strong>
+            <small>주소 좌표 및 위치 확인</small>
           </div>
-        </article>
-
-        <article class="panel action-panel">
-          <div class="panel-head">
-            <div>
-              <p class="eyebrow">수익 판단</p>
-              <h2>수익 가능성 판단</h2>
-            </div>
+          <div class="metric">
+            <span>분석 단위</span>
+            <strong>강릉시</strong>
+            <small>동, 단지, 거래유형별 비교</small>
           </div>
-          <div id="profitCards" class="profit-cards"></div>
-        </article>
-      </section>
-
-      <section class="kpis">
-        <article>
-          <span>총 거래</span>
-          <strong id="totalDeals">-</strong>
-        </article>
-        <article>
-          <span>매매</span>
-          <strong id="saleDeals">-</strong>
-        </article>
-        <article>
-          <span>전세</span>
-          <strong id="jeonseDeals">-</strong>
-        </article>
-        <article>
-          <span>월세</span>
-          <strong id="rentDeals">-</strong>
-        </article>
-      </section>
-
-      <section class="panel additional-analysis">
-        <div class="panel-head">
-          <div>
-            <p class="eyebrow">추가 분석</p>
-            <h2>현재 실거래 데이터로 보는 시장 스냅샷</h2>
-          </div>
-          <span class="chip">실거래 기반 · 추정치 구분</span>
-        </div>
-        <div id="additionalAnalysis" class="analysis-cards"></div>
-      </section>
-
-      <section class="panel framework-panel">
-        <div class="panel-head">
-          <div>
-            <p class="eyebrow">시장분석 프레임</p>
-            <h2>부동산 빅데이터 시장분석 지표</h2>
-          </div>
-          <span class="chip">시장분석 핵심지표</span>
-        </div>
-        <div id="metricTabs" class="metric-tabs" aria-label="시장분석 지표 선택">
-          <button type="button" class="metric-tab active" data-metric="demand"><span>01</span>수요/거래</button>
-          <button type="button" class="metric-tab" data-metric="supply"><span>02</span>공급/미분양</button>
-          <button type="button" class="metric-tab" data-metric="price"><span>03</span>가격지수</button>
-          <button type="button" class="metric-tab" data-metric="sentiment"><span>04</span>매수심리</button>
-          <button type="button" class="metric-tab" data-metric="pir"><span>05</span>PIR/부담</button>
-          <button type="button" class="metric-tab" data-metric="risk"><span>06</span>신용/리스크</button>
-        </div>
-        <div id="metricInsight" class="metric-insight"></div>
-      </section>
-
-      <section class="grid two">
-        <article class="panel">
-          <div class="panel-head">
-            <div>
-              <p class="eyebrow">거래 순위</p>
-              <h2>거래량 Top 10</h2>
-            </div>
-            <span id="rankMeta" class="chip">-</span>
-          </div>
-          <div id="topList" class="top-list"></div>
-        </article>
-
-        <article class="panel">
-          <div class="panel-head">
-            <div>
-              <p class="eyebrow">거래 유형</p>
-              <h2>거래유형별 막대그래프</h2>
-            </div>
-          </div>
-          <canvas id="typeChart" class="compact-chart" height="190"></canvas>
-        </article>
-      </section>
-
-      <section class="grid two">
-        <article class="panel calendar-panel">
-          <div class="panel-head">
-            <div>
-              <p class="eyebrow">거래 일자</p>
-              <h2>거래 달력 <span id="calendarTitle" class="inline-month"></span></h2>
-            </div>
-            <label class="panel-select">
-              기준 월
-              <select id="calendarMonthSelect"></select>
-            </label>
-          </div>
-          <div id="calendar" class="calendar"></div>
-        </article>
-
-        <article class="panel">
-          <div class="panel-head">
-            <div>
-              <p class="eyebrow">단지 비교</p>
-              <h2>Top 10 vs 선택 단지</h2>
-            </div>
-          </div>
-          <canvas id="compareChart" height="260"></canvas>
-          <div id="locationScore" class="location-score"></div>
-        </article>
-      </section>
-
-      <section class="panel map-panel">
-        <div class="panel-head">
-          <div>
-            <p class="eyebrow">위치 정보</p>
-            <h2>선택 아파트 위치</h2>
-          </div>
-          <span id="mapAptName" class="chip">단지 선택</span>
-        </div>
-        <div class="map-layout">
-          <div class="address-card">
-            <span>주소</span>
-            <strong id="mapAddress">아파트를 선택하면 주소와 지도가 표시됩니다.</strong>
-            <div id="mapLinks" class="map-links"></div>
-          </div>
-          <div class="map-canvas">
-            <iframe id="mapFrame" class="map-frame" title="선택 아파트 지도" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
-            <div id="mapRadiusOverlay" class="map-radius-overlay" aria-label="입지 반경 표시"></div>
+          <div class="metric">
+            <span>화면 상태</span>
+            <strong>바로 표시</strong>
+            <small>GitHub Pages에서 깨지지 않는 정적 화면</small>
           </div>
         </div>
       </section>
 
-      <section class="panel">
-        <div class="panel-head">
-          <div>
-            <p class="eyebrow">월별 흐름</p>
-            <h2>월별 거래 흐름</h2>
-          </div>
-          <div class="panel-actions">
-            <label class="panel-select">
-              거래 유형
-              <select id="trendTypeSelect">
-                <option value="all">전체</option>
-                <option value="매매">매매</option>
-                <option value="전세">전세</option>
-                <option value="월세">월세</option>
-              </select>
-            </label>
-            <label class="panel-select">
-              표시 기간
-              <select id="trendMonthsSelect">
-                <option value="6">최근 6개월</option>
-                <option value="12" selected>최근 12개월</option>
-                <option value="24">최근 24개월</option>
-              </select>
-            </label>
-          </div>
+      <section>
+        <div class="section-head">
+          <div class="label">핵심 기능</div>
+          <h2>대시보드에서 확인하는 분석</h2>
         </div>
-        <canvas id="trendChart" height="240"></canvas>
-      </section>
-
-      <section class="panel">
-        <div class="panel-head">
-          <div>
-            <p class="eyebrow">최근 거래</p>
-            <h2>선택 아파트 최근 실거래</h2>
+        <div class="feature-grid">
+          <div class="feature">
+            <h3>기간별 거래 흐름</h3>
+            <p>일간, 주간, 월간, 년간 기준으로 매매, 전세, 월세 거래량과 가격 흐름을 비교합니다.</p>
           </div>
-          <div class="panel-actions">
-            <label class="panel-select">
-              거래 유형
-              <select id="dealTypeSelect">
-                <option value="all">전체</option>
-                <option value="매매">매매</option>
-                <option value="전세">전세</option>
-                <option value="월세">월세</option>
-              </select>
-            </label>
-            <span id="dealTableMeta" class="chip">단지 선택</span>
+          <div class="feature">
+            <h3>선택 단지 분석</h3>
+            <p>아파트를 선택하면 주소, 최근 실거래, 비교 단지, Top 10 순위를 함께 확인합니다.</p>
           </div>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>거래일</th>
-                <th>유형</th>
-                <th>아파트</th>
-                <th>전용면적</th>
-                <th>층</th>
-                <th>금액</th>
-                <th>주소</th>
-              </tr>
-            </thead>
-            <tbody id="dealTable"></tbody>
-          </table>
+          <div class="feature">
+            <h3>입지 경쟁력</h3>
+            <p>역세권, 학군/학교권, 주민센터, 상권 접근성을 지도 반경과 거리로 표시합니다.</p>
+          </div>
+          <div class="feature">
+            <h3>시장 전망</h3>
+            <p>거래 증감, 가격 변화, 매매 비중, 리스크 신호를 조합해 강릉시 전망을 요약합니다.</p>
+          </div>
+          <div class="feature">
+            <h3>거래 달력</h3>
+            <p>연월을 선택해 날짜별 거래 건수를 빠르게 확인하고 특정 시점의 집중도를 살핍니다.</p>
+          </div>
+          <div class="feature">
+            <h3>공식 데이터 우선</h3>
+            <p>자동수집은 공식 API와 다운로드 가능한 데이터 중심으로 연결하고, 출처와 기준월을 구분합니다.</p>
+          </div>
         </div>
       </section>
 
-      <p id="status" class="status">대시보드를 준비 중입니다.</p>
+      <section>
+        <div class="section-head">
+          <div class="label">월별 흐름 예시</div>
+          <h2>매매 · 전세 · 월세 거래량 비교</h2>
+        </div>
+        <div class="chart" aria-label="월별 거래 흐름 예시 그래프">
+          <div class="bars">
+            <div class="bar" style="height: 52%"></div>
+            <div class="bar" style="height: 46%"></div>
+            <div class="bar" style="height: 61%"></div>
+            <div class="bar" style="height: 58%"></div>
+            <div class="bar" style="height: 44%"></div>
+            <div class="bar" style="height: 67%"></div>
+            <div class="bar" style="height: 72%"></div>
+            <div class="bar" style="height: 53%"></div>
+            <div class="bar" style="height: 49%"></div>
+            <div class="bar" style="height: 64%"></div>
+            <div class="bar" style="height: 57%"></div>
+            <div class="bar" style="height: 41%"></div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-head">
+          <div class="label">실행 방법</div>
+          <h2>실제 데이터 조회는 로컬에서 실행</h2>
+        </div>
+        <div class="steps">
+          <div class="step">
+            <span class="num">1</span>
+            <h3>파일 받기</h3>
+            <p>GitHub 저장소 파일을 내려받거나 기존 로컬 프로젝트 폴더를 엽니다.</p>
+          </div>
+          <div class="step">
+            <span class="num">2</span>
+            <h3>실행파일 클릭</h3>
+            <p><code>강릉시_아파트_대시보드_배포용.exe</code> 또는 실행 배치파일을 클릭합니다.</p>
+          </div>
+          <div class="step">
+            <span class="num">3</span>
+            <h3>브라우저 확인</h3>
+            <p>로컬 서버가 켜지면 <code>http://localhost:5177/</code>에서 최종 대시보드를 확인합니다.</p>
+          </div>
+        </div>
+        <div class="actions">
+          <a class="button primary" href="https://github.com/cyarcis-tarot/ds">GitHub 저장소 열기</a>
+          <a class="button" href="https://cyarcis-tarot.github.io/ds/">배포 페이지 열기</a>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-head">
+          <div class="label">중요 안내</div>
+          <h2>공개 페이지와 로컬 대시보드의 차이</h2>
+        </div>
+        <div class="notice-grid">
+          <div class="notice">
+            <h3>API키 보호</h3>
+            <p>공개 GitHub Pages에는 공공데이터포털, VWorld API키를 넣지 않습니다.</p>
+          </div>
+          <div class="notice">
+            <h3>서버 기능</h3>
+            <p>실거래 자동수집과 좌표 변환은 로컬 서버의 <code>server.js</code>에서 실행됩니다.</p>
+          </div>
+          <div class="notice">
+            <h3>배포 안정성</h3>
+            <p>이 인덱스는 외부 API 호출 없이 즉시 표시되므로 GitHub Pages에서 빈 화면이 되지 않습니다.</p>
+          </div>
+        </div>
+      </section>
     </main>
-    <script src="./app.js"></script>
+
+    <footer class="footer">
+      출처: 공공데이터포털, VWorld, 국토교통부 실거래 공개자료. 공개 페이지는 안내용이며, 최종 분석값은 로컬 실행 대시보드에서 확인합니다.
+    </footer>
   </body>
 </html>
