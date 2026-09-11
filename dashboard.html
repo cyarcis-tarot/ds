@@ -121,6 +121,7 @@
           <button type="button" class="metric-tab" data-metric="risk"><span>06</span>신용/리스크</button>
         </div>
         <div id="metricInsight" class="metric-insight"></div>
+        <div id="externalDataStatus" class="external-data-status"></div>
       </section>
 
       <section class="grid two">
@@ -138,10 +139,10 @@
           <div class="panel-head">
             <div>
               <p class="eyebrow">거래 유형</p>
-              <h2>거래유형별 막대그래프</h2>
+              <h2>거래유형별 원형그래프</h2>
             </div>
           </div>
-          <canvas id="typeChart" class="compact-chart" height="190"></canvas>
+          <canvas id="typeChart" class="compact-chart" height="280"></canvas>
         </article>
       </section>
 
@@ -186,10 +187,30 @@
             <div id="mapLinks" class="map-links"></div>
           </div>
           <div class="map-canvas">
-            <iframe id="mapFrame" class="map-frame" title="선택 아파트 지도" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+            <div id="mapFrame" class="map-frame" role="img" aria-label="선택 아파트 지도"></div>
             <div id="mapRadiusOverlay" class="map-radius-overlay" aria-label="입지 반경 표시"></div>
           </div>
         </div>
+      </section>
+
+      <section class="panel projection-panel">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">지정 아파트 전망</p>
+            <h2>선택 아파트 1~5년 전망</h2>
+          </div>
+          <label class="panel-select">
+            전망 기간
+            <select id="projectionYearsSelect">
+              <option value="1">1년</option>
+              <option value="2">2년</option>
+              <option value="3" selected>3년</option>
+              <option value="4">4년</option>
+              <option value="5">5년</option>
+            </select>
+          </label>
+        </div>
+        <div id="projectionContent" class="projection-content"></div>
       </section>
 
       <section class="panel">

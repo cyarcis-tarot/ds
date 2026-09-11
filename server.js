@@ -32,6 +32,7 @@ const transactionCache = new Map();
 const monthCache = new Map();
 const geocodeCache = new Map();
 const facilityCache = new Map();
+const externalCache = new Map();
 const CACHE_MS = 1000 * 60 * 20;
 const FETCH_TIMEOUT_MS = 9000;
 
@@ -58,6 +59,14 @@ const server = http.createServer(async (req, res) => {
     }
     if (url.pathname === "/api/facilities") {
       await handleFacilities(url, res);
+      return;
+    }
+    if (url.pathname === "/api/external-indicators") {
+      await handleExternalIndicators(res);
+      return;
+    }
+    if (url.pathname === "/api/map-tile") {
+      await handleMapTile(url, res);
       return;
     }
     serveStatic(url.pathname, res);
@@ -333,6 +342,84 @@ async function handleFacilities(url, res) {
   sendJson(res, 200, payload);
 }
 
+async function handleExternalIndicators(res) {
+  const cached = getFreshCache(externalCache, "market");
+  if (cached) {
+    sendJson(res, 200, { ...cached, cached: true });
+    return;
+  }
+
+  const csvPath = path.join(ROOT, "data", "market-indicators.csv");
+  if (!fs.existsSync(csvPath)) {
+    const payload = {
+      configured: false,
+      generatedAt: new Date().toISOString(),
+      rows: [],
+      latest: null,
+      todo: [
+        "프로젝트 루트의 data 폴더에 market-indicators.csv를 추가하세요.",
+        "필수 열: year, unsoldUnits, moveInUnits, householdIncome",
+        "선택 열: mortgageRate, source",
+      ],
+    };
+    externalCache.set("market", { time: Date.now(), data: payload });
+    sendJson(res, 200, payload);
+    return;
+  }
+
+  const rows = parseCsv(fs.readFileSync(csvPath, "utf8")).map((row) => ({
+    year: Number(row.year),
+    unsoldUnits: Number(cleanNumber(row.unsoldUnits)),
+    moveInUnits: Number(cleanNumber(row.moveInUnits)),
+    householdIncome: Number(cleanNumber(row.householdIncome)),
+    mortgageRate: Number(cleanNumber(row.mortgageRate)),
+    source: tidy(row.source),
+  })).filter((row) => Number.isFinite(row.year));
+
+  const currentYear = new Date().getFullYear();
+  const latestPool = rows.filter((row) => row.year <= currentYear);
+  const latest = (latestPool.length ? latestPool : rows).slice().sort((a, b) => b.year - a.year)[0] || null;
+  const payload = {
+    configured: true,
+    generatedAt: new Date().toISOString(),
+    rows,
+    latest,
+    todo: rows.length ? [] : ["market-indicators.csv에 최소 1개 연도 데이터를 입력하세요."],
+  };
+  externalCache.set("market", { time: Date.now(), data: payload });
+  sendJson(res, 200, payload);
+}
+
+async function handleMapTile(url, res) {
+  if (!VWORLD_API_KEY) {
+    sendJson(res, 500, { error: ".env 파일에 VWORLD_API_KEY를 설정해 주세요." });
+    return;
+  }
+
+  const z = clamp(Number(url.searchParams.get("z")), 6, 19);
+  const x = Number(url.searchParams.get("x"));
+  const y = Number(url.searchParams.get("y"));
+  if (![z, x, y].every(Number.isInteger)) {
+    sendJson(res, 400, { error: "지도 타일 좌표가 올바르지 않습니다." });
+    return;
+  }
+
+  const tileUrl = `https://api.vworld.kr/req/wmts/1.0.0/${encodeURIComponent(VWORLD_API_KEY)}/Base/${z}/${y}/${x}.png`;
+  const response = await fetch(tileUrl, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+  if (!response.ok) {
+    sendJson(res, response.status, { error: `VWorld 지도 타일 응답 오류 ${response.status}` });
+    return;
+  }
+
+  const buffer = Buffer.from(await response.arrayBuffer());
+  res.writeHead(200, {
+    ...corsHeaders(),
+    "content-type": response.headers.get("content-type") || "image/png",
+    "cache-control": "public, max-age=86400",
+  });
+  res.end(buffer);
+}
+
 async function runWithConcurrency(items, limit, worker) {
   const results = new Array(items.length);
   let index = 0;
@@ -517,6 +604,41 @@ function parseRtmsXml(xml) {
     return obj;
   });
   return { totalCount, items };
+}
+
+function parseCsv(text) {
+  const lines = String(text || "").split(/\r?\n/).filter((line) => line.trim() && !line.trim().startsWith("#"));
+  if (!lines.length) return [];
+  const headers = splitCsvLine(lines[0]).map((value) => value.trim());
+  return lines.slice(1).map((line) => {
+    const values = splitCsvLine(line);
+    return headers.reduce((row, header, index) => {
+      row[header] = values[index] || "";
+      return row;
+    }, {});
+  });
+}
+
+function splitCsvLine(line) {
+  const values = [];
+  let current = "";
+  let quoted = false;
+  for (let i = 0; i < line.length; i += 1) {
+    const char = line[i];
+    if (char === '"' && line[i + 1] === '"') {
+      current += '"';
+      i += 1;
+    } else if (char === '"') {
+      quoted = !quoted;
+    } else if (char === "," && !quoted) {
+      values.push(current);
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+  values.push(current);
+  return values.map((value) => value.trim());
 }
 
 function serveStatic(requestPath, res) {

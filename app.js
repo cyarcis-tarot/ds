@@ -15,6 +15,8 @@ const state = {
   dataCache: new Map(),
   apiHealth: null,
   facilityCache: new Map(),
+  externalData: null,
+  mapState: null,
   sourceStatus: {
     transactions: { state: "checking", lastChecked: "", detail: "확인 중" },
     geocode: { state: "checking", lastChecked: "", detail: "확인 중" },
@@ -45,6 +47,7 @@ const el = {
   profitCards: document.querySelector("#profitCards"),
   metricTabs: document.querySelector("#metricTabs"),
   metricInsight: document.querySelector("#metricInsight"),
+  externalDataStatus: document.querySelector("#externalDataStatus"),
   rankMeta: document.querySelector("#rankMeta"),
   topList: document.querySelector("#topList"),
   calendar: document.querySelector("#calendar"),
@@ -62,6 +65,8 @@ const el = {
   trendTypeSelect: document.querySelector("#trendTypeSelect"),
   trendMonthsSelect: document.querySelector("#trendMonthsSelect"),
   trendChart: document.querySelector("#trendChart"),
+  projectionYearsSelect: document.querySelector("#projectionYearsSelect"),
+  projectionContent: document.querySelector("#projectionContent"),
 };
 
 const colors = {
@@ -107,6 +112,7 @@ el.dealTypeSelect.addEventListener("change", () => {
 });
 el.trendTypeSelect.addEventListener("change", drawTrendChart);
 el.trendMonthsSelect.addEventListener("change", drawTrendChart);
+el.projectionYearsSelect?.addEventListener("change", renderProjection);
 el.topList.addEventListener("click", (event) => {
   const row = event.target.closest("[data-apt]");
   if (!row) return;
@@ -120,6 +126,7 @@ el.metricTabs.addEventListener("click", (event) => {
   renderFramework();
 });
 window.addEventListener("resize", debounce(renderCharts, 120));
+window.addEventListener("resize", debounce(renderMapTiles, 120));
 
 loadData();
 
@@ -140,6 +147,7 @@ async function loadData() {
     if (missing.length) {
       throw new Error(`${missing.join(", ")} API 키가 설정되지 않았습니다.`);
     }
+    await loadExternalData();
     setStatus(`${providerSummary(health)} 연결 확인. 강릉시 실거래가를 불러오는 중입니다.`);
 
     const response = await fetch(`${API_ORIGIN}/api/transactions?months=${requestedMonths}`);
@@ -172,6 +180,25 @@ function useTransactionData(data, fromCache) {
   const warningText = data.warnings?.length ? ` 일부 월 데이터 경고 ${data.warnings.length}건.` : "";
   const cacheText = fromCache ? " 캐시 사용." : "";
   setStatus(`${data.region.name} ${getPeriodScopeLabel()} 표시 ${format(state.periodRows.length)}건, 분석용 ${format(state.rows.length)}건 로드.${cacheText}${warningText}`);
+}
+
+async function loadExternalData() {
+  if (state.externalData) return state.externalData;
+  try {
+    const response = await fetch(`${API_ORIGIN}/api/external-indicators`);
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || "외부지표 로드 실패");
+    state.externalData = data;
+  } catch (error) {
+    state.externalData = {
+      configured: false,
+      rows: [],
+      latest: null,
+      todo: ["data/market-indicators.csv 파일을 추가하세요.", "필수 열: year, unsoldUnits, moveInUnits, householdIncome"],
+      error: error.message,
+    };
+  }
+  return state.externalData;
 }
 
 async function getApiHealth() {
@@ -281,6 +308,7 @@ function render() {
   renderMap();
   renderDealTable();
   renderCharts();
+  renderProjection();
 }
 
 function renderFilterMeta() {
@@ -362,11 +390,14 @@ function renderProfitDecision() {
   const aptRows = state.filtered.filter((row) => row.apartment === apt);
   const scopeRows = state.filtered.length ? state.filtered : state.baseRows;
   const stats = computeApartmentStats(aptRows, scopeRows);
+  const current = latestExternalIndicator();
   el.profitCards.innerHTML = [
     { label: "선택 단지", value: apt || "단지 선택", note: stats.address || "Top10 또는 드롭다운에서 선택" },
     { label: "유동성 점수", value: `${stats.liquidityScore}점`, note: stats.liquidityNote },
     { label: "전세가율 추정", value: stats.jeonseRatioText, note: "실거래 평균 매매가 대비 전세 보증금" },
     { label: "월세 수익률 추정", value: stats.rentYieldText, note: "월세 실거래가 있을 때 연 환산" },
+    { label: "평균 매매가", value: stats.avgSaleText, note: "선택 기간 단지 매매 실거래 평균" },
+    { label: "수익판단 보강", value: current ? "외부지표 반영" : "CSV 필요", note: current ? `가구소득 ${formatMoney(current.householdIncome)} 기준` : "가구소득/입주량 CSV를 넣으면 부담률과 공급 리스크를 반영" },
   ].map((card) => `
     <div class="profit-card">
       <span>${escapeHtml(card.label)}</span>
@@ -378,7 +409,8 @@ function renderProfitDecision() {
 
 function renderFramework() {
   const stats = computeMarketStats(state.filtered);
-  const externalNeeded = "외부지표 필요";
+  const current = latestExternalIndicator();
+  const externalNeeded = current ? "외부지표 반영" : "CSV 필요";
   const items = {
     demand: {
       title: "수요/거래량",
@@ -389,8 +421,8 @@ function renderFramework() {
     supply: {
       title: "공급/미분양",
       score: externalNeeded,
-      text: "수요/입주, 미분양 지표는 전망 핵심입니다. 현재 앱은 실거래 API 중심이라 입주예정량과 미분양 원자료가 연결되면 공급 리스크 카드가 자동 산출되도록 연결 지점만 분리했습니다.",
-      data: ["현재 연결", "실거래", "추가 권장", "미분양/입주량 CSV", "판단", "공급 과잉 여부"],
+      text: current ? `외부 CSV 기준 미분양 ${format(current.unsoldUnits)}호, 입주량 ${format(current.moveInUnits)}호를 시장 점수에 참고합니다.` : "미분양/입주량 CSV가 들어오면 공급 리스크를 함께 판단합니다.",
+      data: ["미분양", current ? `${format(current.unsoldUnits)}호` : "CSV 필요", "입주량", current ? `${format(current.moveInUnits)}호` : "CSV 필요", "해야 할 일", "data/market-indicators.csv 추가"],
     },
     price: {
       title: "가격지수/가격흐름",
@@ -407,8 +439,8 @@ function renderFramework() {
     pir: {
       title: "PIR/주택구입부담",
       score: externalNeeded,
-      text: "PIR, JPIR, HAI는 소득과 금융비용이 필요합니다. 현재는 선택 단지의 평균 매매가와 전세가율을 보여주고, 소득 자료가 들어오면 구매부담 점수로 확장합니다.",
-      data: ["현재 계산", "매매가/전세가율", "추가 권장", "강릉시 가구소득", "판단", "구매 부담"],
+      text: current ? `강릉시 가구소득 ${formatMoney(current.householdIncome)}을 기준으로 선택 단지 구매부담을 보강합니다.` : "강릉시 가구소득 CSV가 들어오면 PIR/구매부담 판단이 활성화됩니다.",
+      data: ["가구소득", current ? formatMoney(current.householdIncome) : "CSV 필요", "현재 계산", "매매가/전세가율", "해야 할 일", "강릉시 가구소득 입력"],
     },
     risk: {
       title: "신용/리스크",
@@ -429,6 +461,7 @@ function renderFramework() {
       ${active.data.map((value, index) => index % 2 === 0 ? `<dt>${escapeHtml(value)}</dt>` : `<dd>${escapeHtml(value)}</dd>`).join("")}
     </dl>
   `;
+  renderExternalDataStatus();
 }
 
 function renderCalendar() {
@@ -467,7 +500,7 @@ function renderDealTable() {
   el.dealTable.innerHTML = rows.map((row) => `
     <tr>
       <td>${escapeHtml(row.date)}</td>
-      <td><span class="deal-type">${escapeHtml(row.tradeType)}</span></td>
+      <td><span class="deal-type ${tradeTypeClass(row.tradeType)}">${escapeHtml(row.tradeType)}</span></td>
       <td>${escapeHtml(row.apartment)}</td>
       <td>${row.area ? `${formatNumber(row.area, 2)}㎡` : "-"}</td>
       <td>${row.floor ?? "-"}</td>
@@ -495,7 +528,7 @@ function renderMap() {
     el.mapAptName.textContent = "단지 선택";
     el.mapAddress.innerHTML = `강원특별자치도 강릉시<small>단지를 선택하면 해당 주소와 반경 정보가 표시됩니다.</small>`;
     el.mapLinks.innerHTML = mapLinks("강원특별자치도 강릉시");
-    el.mapFrame.src = osmEmbedSrc(37.7519, 128.8761, 0.035);
+    initMap(37.7519, 128.8761, []);
     renderMapRadiusOverlay([]);
     return;
   }
@@ -504,7 +537,7 @@ function renderMap() {
   const query = `${address} ${apt}`;
   el.mapAptName.textContent = apt;
   el.mapAddress.innerHTML = `${escapeHtml(address)}<small>${escapeHtml(apt)} · ${escapeHtml(row.dong)} · 브이월드 좌표 확인 중</small>`;
-  el.mapFrame.src = osmEmbedSrc(37.7519, 128.8761, 0.04);
+  initMap(37.7519, 128.8761, []);
   el.mapLinks.innerHTML = mapLinks(query);
   renderMapRadiusOverlay([]);
 
@@ -518,7 +551,6 @@ function renderMap() {
         ${escapeHtml(refined)}
         <small>${escapeHtml(apt)} · ${escapeHtml(row.dong)} · 브이월드 ${escapeHtml(geo.type)} 좌표 ${escapeHtml(coordText)}</small>
       `;
-      el.mapFrame.src = osmEmbedSrc(geo.lat, geo.lng, 0.0025);
       el.mapLinks.innerHTML = mapLinks(query, geo);
       renderFacilityScores([], "VWorld 주변시설 검색 중");
       const facilities = await getVworldFacilities(geo);
@@ -526,6 +558,7 @@ function renderMap() {
       updateSourceStatus("geocode", "ok", facilities.generatedAt, `좌표 및 주변시설 ${countFacilities(facilities)}건`);
       const profile = flattenFacilities(facilities).slice(0, 6);
       renderFacilityScores(profile);
+      initMap(geo.lat, geo.lng, profile);
       renderMapRadiusOverlay(profile);
       el.mapAddress.innerHTML = `
         ${escapeHtml(refined)}
@@ -587,6 +620,90 @@ function osmEmbedSrc(lat, lng, span = 0.01) {
   return `https://www.openstreetmap.org/export/embed.html?bbox=${west}%2C${south}%2C${east}%2C${north}&layer=mapnik&marker=${lat}%2C${lng}`;
 }
 
+function initMap(lat, lng, profile) {
+  state.mapState = {
+    lat: Number(lat),
+    lng: Number(lng),
+    zoom: 16,
+    profile: profile || [],
+    drag: null,
+  };
+  renderMapTiles();
+}
+
+function renderMapTiles() {
+  const map = state.mapState;
+  if (!map || !el.mapFrame) return;
+  const width = Math.max(320, el.mapFrame.clientWidth || 640);
+  const height = Math.max(260, el.mapFrame.clientHeight || 320);
+  const center = latLngToPixel(map.lat, map.lng, map.zoom);
+  const startX = center.x - width / 2;
+  const startY = center.y - height / 2;
+  const tileSize = 256;
+  const minTileX = Math.floor(startX / tileSize);
+  const maxTileX = Math.floor((startX + width) / tileSize);
+  const minTileY = Math.floor(startY / tileSize);
+  const maxTileY = Math.floor((startY + height) / tileSize);
+  const tiles = [];
+  const maxTile = 2 ** map.zoom;
+
+  for (let x = minTileX; x <= maxTileX; x += 1) {
+    for (let y = minTileY; y <= maxTileY; y += 1) {
+      if (y < 0 || y >= maxTile) continue;
+      const wrappedX = ((x % maxTile) + maxTile) % maxTile;
+      tiles.push(`<img class="map-tile" src="${API_ORIGIN}/api/map-tile?z=${map.zoom}&x=${wrappedX}&y=${y}" style="left:${Math.round(x * tileSize - startX)}px;top:${Math.round(y * tileSize - startY)}px" alt="">`);
+    }
+  }
+
+  el.mapFrame.innerHTML = `
+    <div class="map-tile-layer">${tiles.join("")}</div>
+    <div class="map-center-pin"><span aria-hidden="true">🏢</span><strong>선택 아파트</strong></div>
+    <div class="map-attribution">VWorld 공간정보</div>
+    <div class="map-zoom">
+      <button type="button" data-map-zoom="1">+</button>
+      <button type="button" data-map-zoom="-1">-</button>
+    </div>
+  `;
+
+  el.mapFrame.onpointerdown = (event) => {
+    if (event.target.closest("button")) return;
+    el.mapFrame.setPointerCapture(event.pointerId);
+    map.drag = { x: event.clientX, y: event.clientY, lat: map.lat, lng: map.lng };
+  };
+  el.mapFrame.onpointermove = (event) => {
+    if (!map.drag) return;
+    const base = latLngToPixel(map.drag.lat, map.drag.lng, map.zoom);
+    const next = pixelToLatLng(base.x - (event.clientX - map.drag.x), base.y - (event.clientY - map.drag.y), map.zoom);
+    map.lat = next.lat;
+    map.lng = next.lng;
+    renderMapTiles();
+  };
+  el.mapFrame.onpointerup = () => { map.drag = null; };
+  el.mapFrame.onclick = (event) => {
+    const button = event.target.closest("[data-map-zoom]");
+    if (!button) return;
+    map.zoom = clamp(map.zoom + Number(button.dataset.mapZoom), 12, 18);
+    renderMapTiles();
+  };
+}
+
+function latLngToPixel(lat, lng, zoom) {
+  const scale = 256 * 2 ** zoom;
+  const sin = Math.sin(lat * Math.PI / 180);
+  return {
+    x: (lng + 180) / 360 * scale,
+    y: (0.5 - Math.log((1 + sin) / (1 - sin)) / (4 * Math.PI)) * scale,
+  };
+}
+
+function pixelToLatLng(x, y, zoom) {
+  const scale = 256 * 2 ** zoom;
+  const lng = x / scale * 360 - 180;
+  const n = Math.PI - 2 * Math.PI * y / scale;
+  const lat = 180 / Math.PI * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n)));
+  return { lat, lng };
+}
+
 function renderCharts() {
   drawTypeChart();
   drawCompareChart();
@@ -599,7 +716,7 @@ function drawTypeChart() {
     { label: "전세", value: countType("전세"), color: colors.jeonse },
     { label: "월세", value: countType("월세"), color: colors.rent },
   ];
-  barChart(el.typeChart, values, "거래 건수");
+  pieChart(el.typeChart, values, "거래유형");
 }
 
 function drawCompareChart() {
@@ -765,9 +882,86 @@ function computeApartmentStats(aptRows, scopeRows) {
     address,
     liquidityScore,
     liquidityNote: aptRows.length ? `선택 기간 ${format(aptRows.length)}건 거래` : "선택 단지 거래 없음",
+    avgSale,
+    avgSaleText: formatMoney(avgSale),
     jeonseRatioText: jeonseRatio ? `${formatNumber(jeonseRatio, 1)}%` : "데이터 부족",
     rentYieldText: rentYield ? `${formatNumber(rentYield, 2)}%` : "데이터 부족",
   };
+}
+
+function renderExternalDataStatus() {
+  if (!el.externalDataStatus) return;
+  const data = state.externalData;
+  const latest = latestExternalIndicator();
+  if (latest) {
+    el.externalDataStatus.innerHTML = `
+      <div class="external-ready">
+        <strong>외부지표 연결</strong>
+        <span>${latest.year}년 · 미분양 ${format(latest.unsoldUnits)}호 · 입주량 ${format(latest.moveInUnits)}호 · 가구소득 ${formatMoney(latest.householdIncome)}</span>
+      </div>
+    `;
+    return;
+  }
+
+  const todo = data?.todo?.length ? data.todo : ["data/market-indicators.csv 파일을 추가하세요.", "필수 열: year, unsoldUnits, moveInUnits, householdIncome"];
+  el.externalDataStatus.innerHTML = `
+    <div class="external-todo">
+      <strong>내가 해야 할 일</strong>
+      ${todo.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}
+    </div>
+  `;
+}
+
+function latestExternalIndicator() {
+  const rows = state.externalData?.rows || [];
+  const currentYear = new Date().getFullYear();
+  const candidates = rows.filter((row) => Number(row.year || 0) <= currentYear);
+  return (candidates.length ? candidates : rows).slice().sort((a, b) => Number(b.year || 0) - Number(a.year || 0))[0] || null;
+}
+
+function renderProjection() {
+  if (!el.projectionContent) return;
+  const apt = el.aptSelect.value || state.top10[0]?.name || "";
+  if (!apt) {
+    el.projectionContent.innerHTML = `<div class="projection-empty">단지를 선택하면 1~5년 전망이 표시됩니다.</div>`;
+    return;
+  }
+
+  const years = clamp(Number(el.projectionYearsSelect?.value || 3), 1, 5);
+  const sourceRows = applyAnalysisRangeFilter(state.baseRows).filter((row) => row.apartment === apt);
+  const stats = computeMarketStats(state.filtered.filter((row) => row.apartment === apt));
+  const sales = sourceRows.filter((row) => row.tradeType === "매매" && row.amount > 0).sort((a, b) => a.dateObj - b.dateObj);
+  const latestSale = avg(sales.slice(-5).map((row) => row.amount));
+  const firstSale = avg(sales.slice(0, 5).map((row) => row.amount));
+  const annualMomentum = firstSale && latestSale ? clamp(percentChange(latestSale, firstSale) / Math.max(1, ANALYSIS_MONTHS / 12), -12, 12) : 0;
+  const external = latestExternalIndicator();
+  const supplyPressure = external ? clamp((external.unsoldUnits + external.moveInUnits * 0.35) / 1200 * 100, 0, 100) : 35;
+  const baseChange = clamp(annualMomentum * 0.45 + (stats.score - 50) * 0.08 - supplyPressure * 0.035, -7, 8);
+
+  const rows = Array.from({ length: years }, (_, index) => {
+    const year = new Date().getFullYear() + index + 1;
+    const change = baseChange * (1 - index * 0.08);
+    const amount = latestSale ? latestSale * Math.pow(1 + change / 100, index + 1) : 0;
+    const tone = change >= 3 ? "상승 우위" : change <= -2 ? "조정 가능" : "보합권";
+    return { year, change, amount, tone };
+  });
+
+  el.projectionContent.innerHTML = `
+    <div class="projection-summary">
+      <strong>${escapeHtml(apt)}</strong>
+      <span>${years}년 전망 · 기준 ${latestSale ? formatMoney(latestSale) : "매매 데이터 부족"} · ${external ? "외부 CSV 반영" : "외부 CSV 미반영"}</span>
+    </div>
+    <div class="projection-rows">
+      ${rows.map((row) => `
+        <div class="projection-row">
+          <span>${row.year}년</span>
+          <strong>${escapeHtml(row.tone)}</strong>
+          <em>${formatPercent(row.change)}</em>
+          <small>${row.amount ? formatMoney(row.amount) : "가격 추정 제한"}</small>
+        </div>
+      `).join("")}
+    </div>
+  `;
 }
 
 function clamp(value, min, max) {
@@ -859,6 +1053,50 @@ function barChart(canvas, values, unit) {
     drawText(ctx, `${format(item.value)}건`, x + barW / 2, y - 9, 14, item.color, "center", true);
   });
   drawText(ctx, unit, pad, 22, 12, "#666", "left");
+}
+
+function pieChart(canvas, values, title) {
+  const ctx = readyCanvas(canvas);
+  const { width, height } = canvas;
+  ctx.clearRect(0, 0, width, height);
+  const total = values.reduce((sum, item) => sum + item.value, 0);
+  const cx = Math.min(width * 0.34, 230);
+  const cy = height / 2 + 4;
+  const radius = Math.min(height * 0.42, width * 0.28, 142);
+  let start = -Math.PI / 2;
+
+  if (!total) {
+    drawText(ctx, "표시할 거래유형 데이터가 없습니다.", width / 2, height / 2, 16, "#777", "center", true);
+    return;
+  }
+
+  values.forEach((item) => {
+    const angle = Math.PI * 2 * (item.value / total);
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, radius, start, start + angle);
+    ctx.closePath();
+    ctx.fillStyle = item.color;
+    ctx.fill();
+    start += angle;
+  });
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius * 0.58, 0, Math.PI * 2);
+  ctx.fillStyle = "#fff";
+  ctx.fill();
+  drawText(ctx, title, cx, cy - 10, 16, "#666", "center", true);
+  drawText(ctx, `${format(total)}건`, cx, cy + 18, 26, "#222", "center", true);
+
+  values.forEach((item, index) => {
+    const y = 64 + index * 56;
+    const percent = total ? item.value / total * 100 : 0;
+    ctx.fillStyle = item.color;
+    roundRect(ctx, width * 0.60, y - 16, 22, 22, 5);
+    ctx.fill();
+    drawText(ctx, item.label, width * 0.60 + 34, y, 18, "#333", "left", true);
+    drawText(ctx, `${format(item.value)}건 · ${formatNumber(percent, 1)}%`, width * 0.60 + 34, y + 26, 16, "#666", "left");
+  });
 }
 
 function lineChart(canvas, labels, series) {
@@ -954,18 +1192,7 @@ function radiusLegend(profile) {
 }
 
 function renderMapRadiusOverlay(profile) {
-  if (!profile.length) {
-    el.mapRadiusOverlay.innerHTML = "";
-    return;
-  }
-  const sorted = [...profile].sort((a, b) => a.meters - b.meters);
-  el.mapRadiusOverlay.innerHTML = `
-    <div class="radius-target"><span class="map-pin"></span>선택 단지</div>
-    ${sorted.map((item, index) => {
-      const size = 104 + index * 38;
-      return `<div class="radius-circle r${index + 1}" style="width:${size}px;height:${size}px"><span>${escapeHtml(item.label)} ${formatDistance(item.meters)}</span></div>`;
-    }).join("")}
-  `;
+  el.mapRadiusOverlay.innerHTML = "";
 }
 
 function renderFacilityScores(profile, message = "") {
@@ -1092,6 +1319,13 @@ function formatDealAmount(row) {
   if (row.tradeType === "매매") return formatMoney(row.amount);
   if (row.tradeType === "전세") return `보증금 ${formatMoney(row.amount)}`;
   return `보증금 ${formatMoney(row.amount)} / 월 ${formatNumber(row.monthlyRent)}만원`;
+}
+
+function tradeTypeClass(type) {
+  if (type === "매매") return "deal-type-sale";
+  if (type === "전세") return "deal-type-jeonse";
+  if (type === "월세") return "deal-type-rent";
+  return "";
 }
 
 function toDateKey(date) {
