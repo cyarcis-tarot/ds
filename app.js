@@ -894,10 +894,12 @@ function renderExternalDataStatus() {
   const data = state.externalData;
   const latest = latestExternalIndicator();
   if (latest) {
+    const economic = latestEconomicIndicator();
     el.externalDataStatus.innerHTML = `
       <div class="external-ready">
         <strong>외부지표 연결</strong>
         <span>${latest.year}년 · 미분양 ${format(latest.unsoldUnits)}호 · 입주량 ${format(latest.moveInUnits)}호 · 가구소득 ${formatMoney(latest.householdIncome)}</span>
+        ${economic ? `<span>${escapeHtml(economic.period)} · 고용 ${format(economic.industrialEmployment)}명 · 방문자 ${formatCompact(economic.visitorsH2)}명 · 인구 ${format(economic.populationTotal)}명</span>` : ""}
       </div>
     `;
     return;
@@ -919,6 +921,10 @@ function latestExternalIndicator() {
   return (candidates.length ? candidates : rows).slice().sort((a, b) => Number(b.year || 0) - Number(a.year || 0))[0] || null;
 }
 
+function latestEconomicIndicator() {
+  return state.externalData?.economic?.latest || null;
+}
+
 function renderProjection() {
   if (!el.projectionContent) return;
   const apt = el.aptSelect.value || state.top10[0]?.name || "";
@@ -935,8 +941,10 @@ function renderProjection() {
   const firstSale = avg(sales.slice(0, 5).map((row) => row.amount));
   const annualMomentum = firstSale && latestSale ? clamp(percentChange(latestSale, firstSale) / Math.max(1, ANALYSIS_MONTHS / 12), -12, 12) : 0;
   const external = latestExternalIndicator();
+  const economic = latestEconomicIndicator();
+  const economyBias = computeEconomyBias(economic);
   const supplyPressure = external ? clamp((external.unsoldUnits + external.moveInUnits * 0.35) / 1200 * 100, 0, 100) : 35;
-  const baseChange = clamp(annualMomentum * 0.45 + (stats.score - 50) * 0.08 - supplyPressure * 0.035, -7, 8);
+  const baseChange = clamp(annualMomentum * 0.45 + (stats.score - 50) * 0.08 - supplyPressure * 0.035 + economyBias, -7, 8);
 
   const rows = Array.from({ length: years }, (_, index) => {
     const year = new Date().getFullYear() + index + 1;
@@ -949,8 +957,9 @@ function renderProjection() {
   el.projectionContent.innerHTML = `
     <div class="projection-summary">
       <strong>${escapeHtml(apt)}</strong>
-      <span>${years}년 전망 · 기준 ${latestSale ? formatMoney(latestSale) : "매매 데이터 부족"} · ${external ? "외부 CSV 반영" : "외부 CSV 미반영"}</span>
+      <span>${years}년 전망 · 기준 ${latestSale ? formatMoney(latestSale) : "매매 데이터 부족"} · 실거래/공급/경제브리프 반영</span>
     </div>
+    ${economic ? renderProjectionEconomy(apt, years, external, economic, economyBias) : ""}
     <div class="projection-rows">
       ${rows.map((row) => `
         <div class="projection-row">
@@ -962,6 +971,47 @@ function renderProjection() {
       `).join("")}
     </div>
   `;
+}
+
+function renderProjectionEconomy(apt, years, external, economic, economyBias) {
+  const pressureText = external
+    ? `미분양 ${format(external.unsoldUnits)}호와 입주예정 ${format(external.moveInUnits)}호는 공급 부담으로 반영했습니다.`
+    : "공급 CSV가 없어 미분양/입주량 부담은 제한적으로 반영했습니다.";
+  const direction = economyBias > 0.4 ? "지역경제는 전망을 일부 보강합니다" : economyBias < -0.4 ? "지역경제는 전망의 리스크 요인입니다" : "지역경제는 중립에 가깝게 반영했습니다";
+  const horizon = years <= 2
+    ? "단기에는 관광·고용 회복이 임대수요와 생활수요를 받치지만, 인구 감소와 미분양 증가는 상승 폭을 제한합니다."
+    : "중장기에는 관광 유입과 교통 이용 증가는 긍정적이나, 인구·청년층 감소가 이어지면 선호 단지 중심의 차별화가 커질 가능성이 높습니다.";
+  return `
+    <div class="projection-economy">
+      <div>
+        <p class="eyebrow">강릉시 경제분석 반영</p>
+        <h3>${escapeHtml(direction)}</h3>
+        <p>${escapeHtml(apt)} 전망은 선택 단지 실거래 흐름에 강릉시 경제지표 동향 브리프를 함께 적용했습니다. ${escapeHtml(horizon)} ${escapeHtml(pressureText)}</p>
+      </div>
+      <div class="economy-chips">
+        <span>산업단지 고용 ${format(economic.industrialEmployment)}명 · 6개월 ${formatSigned(economic.industrialEmploymentChange6m)}명</span>
+        <span>아파트 거래 ${format(economic.apartmentTransactions)}호 · 반기 ${formatPercent(economic.apartmentTransactionsHalfChangePct)}</span>
+        <span>방문자 ${formatCompact(economic.visitorsH2)}명 · 전년 ${formatPercent(economic.visitorsYoyPct)}</span>
+        <span>총인구 ${format(economic.populationTotal)}명 · 6개월 ${formatSigned(economic.populationChange6m)}명</span>
+        <span>청년 ${format(economic.youthPopulation)}명 · 6개월 ${formatSigned(economic.youthPopulationChange6m)}명</span>
+        <span>강릉역 하차 ${format(economic.stationRidersH2)}명 · 전년 ${formatPercent(economic.stationRidersYoyPct)}</span>
+      </div>
+    </div>
+  `;
+}
+
+function computeEconomyBias(economic) {
+  if (!economic) return 0;
+  let score = 0;
+  if (economic.industrialEmploymentChange6m > 0) score += 0.45;
+  if (economic.apartmentTransactionsHalfChangePct > 0) score += 0.25;
+  if (economic.visitorsYoyPct > 0) score += 0.35;
+  if (economic.stationRidersYoyPct > 0) score += 0.2;
+  if (economic.populationChange6m < 0) score -= 0.35;
+  if (economic.youthPopulationChange6m < 0) score -= 0.3;
+  if (economic.completedUnsoldChange6m > 0) score -= 0.35;
+  if (economic.depositsYoyPct < 0) score -= 0.15;
+  return clamp(score, -1.2, 1.2);
 }
 
 function clamp(value, min, max) {
@@ -1256,6 +1306,17 @@ function unique(values) {
 
 function format(value) {
   return Number(value || 0).toLocaleString("ko-KR");
+}
+
+function formatSigned(value) {
+  const number = Math.round(Number(value || 0));
+  return `${number > 0 ? "+" : ""}${format(number)}`;
+}
+
+function formatCompact(value) {
+  const number = Number(value || 0);
+  if (number >= 10000) return `${formatNumber(number / 10000, 1)}만`;
+  return format(number);
 }
 
 function getPeriodLabel(period) {

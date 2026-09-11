@@ -982,6 +982,47 @@ canvas {
   font-weight: 800;
 }
 
+.projection-economy {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(280px, .8fr);
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid #d9d0bc;
+  border-left: 5px solid #4f83d1;
+  background: #fbfaf7;
+}
+
+.projection-economy h3 {
+  margin: 5px 0 8px;
+  color: var(--ink);
+  font-size: 24px;
+}
+
+.projection-economy p:not(.eyebrow) {
+  margin: 0;
+  color: #424242;
+  font-size: 16px;
+  line-height: 1.65;
+  font-weight: 750;
+}
+
+.economy-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-content: flex-start;
+}
+
+.economy-chips span {
+  padding: 7px 9px;
+  border: 1px solid #dfd4bd;
+  border-radius: 4px;
+  color: #3c4f63;
+  background: #fff;
+  font-size: 14px;
+  font-weight: 900;
+}
+
 .projection-rows {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -1081,6 +1122,7 @@ tbody tr:nth-child(even) {
 @media (max-width: 920px) {
   .hero, .panel-head { align-items: flex-start; flex-direction: column; }
   .kpis, .grid.two, .source-status, .location-score, .map-layout, .forecast-body, .profit-cards, .metric-insight { grid-template-columns: 1fr; }
+  .projection-economy { grid-template-columns: 1fr; }
   .projection-rows { grid-template-columns: 1fr; }
   .metric-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .analysis-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }

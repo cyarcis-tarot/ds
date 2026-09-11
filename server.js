@@ -376,6 +376,10 @@ async function handleExternalIndicators(res) {
     source: tidy(row.source),
   })).filter((row) => Number.isFinite(row.year));
 
+  const economicPath = path.join(ROOT, "data", "economic-indicators.csv");
+  const economicRows = fs.existsSync(economicPath)
+    ? parseCsv(fs.readFileSync(economicPath, "utf8")).map(normalizeEconomicIndicator)
+    : [];
   const currentYear = new Date().getFullYear();
   const latestPool = rows.filter((row) => row.year <= currentYear);
   const latest = (latestPool.length ? latestPool : rows).slice().sort((a, b) => b.year - a.year)[0] || null;
@@ -384,10 +388,52 @@ async function handleExternalIndicators(res) {
     generatedAt: new Date().toISOString(),
     rows,
     latest,
+    economic: {
+      configured: economicRows.length > 0,
+      latest: economicRows[0] || null,
+      rows: economicRows,
+      source: economicRows[0]?.source || "",
+    },
     todo: rows.length ? [] : ["market-indicators.csv에 최소 1개 연도 데이터를 입력하세요."],
   };
   externalCache.set("market", { time: Date.now(), data: payload });
   sendJson(res, 200, payload);
+}
+
+function normalizeEconomicIndicator(row) {
+  return {
+    period: tidy(row.period),
+    industrialTenants: Number(cleanNumber(row.industrialTenants)),
+    operatingCompanies: Number(cleanNumber(row.operatingCompanies)),
+    industrialEmployment: Number(cleanNumber(row.industrialEmployment)),
+    industrialEmploymentChange6m: Number(cleanNumber(row.industrialEmploymentChange6m)),
+    completedUnsold: Number(cleanNumber(row.completedUnsold)),
+    completedUnsoldChange6m: Number(cleanNumber(row.completedUnsoldChange6m)),
+    apartmentTransactions: Number(cleanNumber(row.apartmentTransactions)),
+    apartmentTransactionsHalfChangePct: Number(cleanNumber(row.apartmentTransactionsHalfChangePct)),
+    apartmentTransactionsYoyPct: Number(cleanNumber(row.apartmentTransactionsYoyPct)),
+    exportsHalfMillionUsd: Number(cleanNumber(row.exportsHalfMillionUsd)),
+    exportsHalfChangePct: Number(cleanNumber(row.exportsHalfChangePct)),
+    importsHalfMillionUsd: Number(cleanNumber(row.importsHalfMillionUsd)),
+    importsHalfChangePct: Number(cleanNumber(row.importsHalfChangePct)),
+    depositsEok: Number(cleanNumber(row.depositsEok)),
+    depositsYoyPct: Number(cleanNumber(row.depositsYoyPct)),
+    loansEok: Number(cleanNumber(row.loansEok)),
+    loansYoyPct: Number(cleanNumber(row.loansYoyPct)),
+    populationTotal: Number(cleanNumber(row.populationTotal)),
+    populationChange6m: Number(cleanNumber(row.populationChange6m)),
+    youthPopulation: Number(cleanNumber(row.youthPopulation)),
+    youthPopulationChange6m: Number(cleanNumber(row.youthPopulationChange6m)),
+    laborParticipationPct: Number(cleanNumber(row.laborParticipationPct)),
+    employmentPct: Number(cleanNumber(row.employmentPct)),
+    unemploymentPct: Number(cleanNumber(row.unemploymentPct)),
+    visitorsH2: Number(cleanNumber(row.visitorsH2)),
+    visitorsYoyPct: Number(cleanNumber(row.visitorsYoyPct)),
+    foreignVisitorsH2: Number(cleanNumber(row.foreignVisitorsH2)),
+    stationRidersH2: Number(cleanNumber(row.stationRidersH2)),
+    stationRidersYoyPct: Number(cleanNumber(row.stationRidersYoyPct)),
+    source: tidy(row.source),
+  };
 }
 
 async function handleMapTile(url, res) {
