@@ -422,7 +422,7 @@ function renderFramework() {
       title: "공급/미분양",
       score: externalNeeded,
       text: current ? `외부 CSV 기준 미분양 ${format(current.unsoldUnits)}호, 입주량 ${format(current.moveInUnits)}호를 시장 점수에 참고합니다.` : "미분양/입주량 CSV가 들어오면 공급 리스크를 함께 판단합니다.",
-      data: ["미분양", current ? `${format(current.unsoldUnits)}호` : "CSV 필요", "입주량", current ? `${format(current.moveInUnits)}호` : "CSV 필요", "해야 할 일", "data/market-indicators.csv 추가"],
+      data: ["미분양", current ? `${format(current.unsoldUnits)}호` : "CSV 필요", "입주량", current ? `${format(current.moveInUnits)}호` : "CSV 필요", "반영 파일", current ? "market-indicators.csv 적용 완료" : "data/market-indicators.csv 필요"],
     },
     price: {
       title: "가격지수/가격흐름",
@@ -439,8 +439,8 @@ function renderFramework() {
     pir: {
       title: "PIR/주택구입부담",
       score: externalNeeded,
-      text: current ? `강릉시 가구소득 ${formatMoney(current.householdIncome)}을 기준으로 선택 단지 구매부담을 보강합니다.` : "강릉시 가구소득 CSV가 들어오면 PIR/구매부담 판단이 활성화됩니다.",
-      data: ["가구소득", current ? formatMoney(current.householdIncome) : "CSV 필요", "현재 계산", "매매가/전세가율", "해야 할 일", "강릉시 가구소득 입력"],
+      text: current ? `강릉시 가구소득 ${formatMoney(current.householdIncome)}은 이미 입력되어 있습니다. 이 값을 기준으로 선택 단지 구매부담을 보강합니다.` : "강릉시 가구소득 CSV가 들어오면 PIR/구매부담 판단이 활성화됩니다.",
+      data: ["가구소득", current ? formatMoney(current.householdIncome) : "CSV 필요", "현재 계산", "매매가/전세가율", "입력 상태", current ? "강릉시 가구소득 입력 완료" : "강릉시 가구소득 필요"],
     },
     risk: {
       title: "신용/리스크",
