@@ -445,12 +445,14 @@ async function handleMapTile(url, res) {
   const z = clamp(Number(url.searchParams.get("z")), 6, 19);
   const x = Number(url.searchParams.get("x"));
   const y = Number(url.searchParams.get("y"));
+  const requestedLayer = tidy(url.searchParams.get("layer")) || "Base";
+  const layer = ["Base", "Satellite", "Hybrid"].includes(requestedLayer) ? requestedLayer : "Base";
   if (![z, x, y].every(Number.isInteger)) {
     sendJson(res, 400, { error: "지도 타일 좌표가 올바르지 않습니다." });
     return;
   }
 
-  const tileUrl = `https://api.vworld.kr/req/wmts/1.0.0/${encodeURIComponent(VWORLD_API_KEY)}/Base/${z}/${y}/${x}.png`;
+  const tileUrl = `https://api.vworld.kr/req/wmts/1.0.0/${encodeURIComponent(VWORLD_API_KEY)}/${layer}/${z}/${y}/${x}.png`;
   const response = await fetch(tileUrl, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
   if (!response.ok) {
     sendJson(res, response.status, { error: `VWorld 지도 타일 응답 오류 ${response.status}` });

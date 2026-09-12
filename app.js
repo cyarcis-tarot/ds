@@ -655,7 +655,10 @@ function renderMapTiles() {
     for (let y = minTileY; y <= maxTileY; y += 1) {
       if (y < 0 || y >= maxTile) continue;
       const wrappedX = ((x % maxTile) + maxTile) % maxTile;
-      tiles.push(`<img class="map-tile" src="${API_ORIGIN}/api/map-tile?z=${map.zoom}&x=${wrappedX}&y=${y}" style="left:${Math.round(x * tileSize - startX)}px;top:${Math.round(y * tileSize - startY)}px" alt="">`);
+      const left = Math.round(x * tileSize - startX);
+      const top = Math.round(y * tileSize - startY);
+      tiles.push(`<img class="map-tile" src="${API_ORIGIN}/api/map-tile?layer=Satellite&z=${map.zoom}&x=${wrappedX}&y=${y}" style="left:${left}px;top:${top}px" alt="">`);
+      tiles.push(`<img class="map-tile map-tile-labels" src="${API_ORIGIN}/api/map-tile?layer=Hybrid&z=${map.zoom}&x=${wrappedX}&y=${y}" style="left:${left}px;top:${top}px" alt="">`);
     }
   }
   const apartment = latLngToPixel(map.apartmentLat, map.apartmentLng, map.zoom);
@@ -665,8 +668,8 @@ function renderMapTiles() {
 
   el.mapFrame.innerHTML = `
     <div class="map-tile-layer">${tiles.join("")}</div>
-    <div class="map-apartment-pin${isMarkerVisible ? "" : " is-hidden"}" style="left:${markerLeft}px;top:${markerTop}px"><span aria-hidden="true">🏢</span><strong>선택 아파트</strong></div>
-    <div class="map-attribution">VWorld 공간정보</div>
+    <div class="map-apartment-pin${isMarkerVisible ? "" : " is-hidden"}" style="left:${markerLeft}px;top:${markerTop}px" title="선택 아파트" aria-label="선택 아파트"></div>
+    <div class="map-attribution">VWorld 항공지도</div>
     <div class="map-zoom">
       <button type="button" data-map-zoom="1">+</button>
       <button type="button" data-map-zoom="-1">-</button>
