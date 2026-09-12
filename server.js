@@ -452,7 +452,8 @@ async function handleMapTile(url, res) {
     return;
   }
 
-  const tileUrl = `https://api.vworld.kr/req/wmts/1.0.0/${encodeURIComponent(VWORLD_API_KEY)}/${layer}/${z}/${y}/${x}.png`;
+  const extension = layer === "Satellite" ? "jpeg" : "png";
+  const tileUrl = `https://api.vworld.kr/req/wmts/1.0.0/${encodeURIComponent(VWORLD_API_KEY)}/${layer}/${z}/${y}/${x}.${extension}`;
   const response = await fetch(tileUrl, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
   if (!response.ok) {
     sendJson(res, response.status, { error: `VWorld 지도 타일 응답 오류 ${response.status}` });

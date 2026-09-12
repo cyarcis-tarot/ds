@@ -794,6 +794,10 @@ canvas {
   position: absolute;
   width: 256px;
   height: 256px;
+  display: block;
+  border: 0;
+  outline: 0;
+  background: transparent;
 }
 
 .map-tile-labels {
