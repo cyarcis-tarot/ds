@@ -424,7 +424,7 @@ function renderFramework() {
       title: "공급/미분양",
       score: current ? `${supplyScore}점` : "CSV 필요",
       text: current ? `외부 CSV 기준 미분양 ${format(current.unsoldUnits)}호, 입주량 ${format(current.moveInUnits)}호를 반영해 공급 부담 점수를 계산했습니다.` : "미분양/입주량 CSV가 들어오면 공급 리스크를 함께 판단합니다.",
-      data: ["미분양", current ? `${format(current.unsoldUnits)}호` : "CSV 필요", "입주량", current ? `${format(current.moveInUnits)}호` : "CSV 필요", "반영 결과", current ? supplyDecision(supplyScore) : "data/market-indicators.csv 필요"],
+      data: ["결과 점수", current ? `${supplyScore}점` : "CSV 필요", "미분양", current ? `${format(current.unsoldUnits)}호` : "CSV 필요", "입주량", current ? `${format(current.moveInUnits)}호` : "CSV 필요", "반영 결과", current ? supplyDecision(supplyScore) : "data/market-indicators.csv 필요"],
     },
     price: {
       title: "가격지수/가격흐름",
@@ -442,7 +442,7 @@ function renderFramework() {
       title: "PIR/주택구입부담",
       score: affordability ? `${affordability.score}점` : "CSV 필요",
       text: affordability ? `강릉시 가구소득 ${formatMoney(current.householdIncome)}과 ${affordability.scopeLabel} 평균 매매가 ${formatMoney(affordability.avgSale)}를 비교해 구매부담 점수를 계산했습니다.` : "강릉시 가구소득 CSV와 매매 실거래가 있으면 PIR/구매부담 점수가 표시됩니다.",
-      data: ["가구소득", current ? formatMoney(current.householdIncome) : "CSV 필요", "PIR", affordability ? `${formatNumber(affordability.pir, 1)}배` : "계산 부족", "반영 결과", affordability ? affordabilityDecision(affordability.score) : "강릉시 가구소득 필요"],
+      data: ["결과 점수", affordability ? `${affordability.score}점` : "계산 부족", "가구소득", current ? formatMoney(current.householdIncome) : "CSV 필요", "PIR", affordability ? `${formatNumber(affordability.pir, 1)}배` : "계산 부족", "반영 결과", affordability ? affordabilityDecision(affordability.score) : "강릉시 가구소득 필요"],
     },
     risk: {
       title: "신용/리스크",
