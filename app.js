@@ -391,13 +391,14 @@ function renderProfitDecision() {
   const scopeRows = state.filtered.length ? state.filtered : state.baseRows;
   const stats = computeApartmentStats(aptRows, scopeRows);
   const current = latestExternalIndicator();
+  const affordability = computeAffordabilityScore(aptRows.length ? aptRows : scopeRows, current);
   el.profitCards.innerHTML = [
     { label: "선택 단지", value: apt || "단지 선택", note: stats.address || "Top10 또는 드롭다운에서 선택" },
     { label: "유동성 점수", value: `${stats.liquidityScore}점`, note: stats.liquidityNote },
     { label: "전세가율 추정", value: stats.jeonseRatioText, note: "실거래 평균 매매가 대비 전세 보증금" },
     { label: "월세 수익률 추정", value: stats.rentYieldText, note: "월세 실거래가 있을 때 연 환산" },
     { label: "평균 매매가", value: stats.avgSaleText, note: "선택 기간 단지 매매 실거래 평균" },
-    { label: "수익판단 보강", value: current ? "외부지표 반영" : "CSV 필요", note: current ? `가구소득 ${formatMoney(current.householdIncome)} 기준` : "가구소득/입주량 CSV를 넣으면 부담률과 공급 리스크를 반영" },
+    { label: "수익판단 보강", value: affordability ? `PIR ${affordability.score}점` : "CSV 필요", note: affordability ? `가구소득 ${formatMoney(current.householdIncome)} · ${affordability.scopeLabel} 기준` : "가구소득/입주량 CSV를 넣으면 부담률과 공급 리스크를 반영" },
   ].map((card) => `
     <div class="profit-card">
       <span>${escapeHtml(card.label)}</span>
@@ -410,7 +411,8 @@ function renderProfitDecision() {
 function renderFramework() {
   const stats = computeMarketStats(state.filtered);
   const current = latestExternalIndicator();
-  const externalNeeded = current ? "외부지표 반영" : "CSV 필요";
+  const supplyScore = computeSupplyScore(current);
+  const affordability = computeAffordabilityScore(state.filtered, current);
   const items = {
     demand: {
       title: "수요/거래량",
@@ -420,9 +422,9 @@ function renderFramework() {
     },
     supply: {
       title: "공급/미분양",
-      score: externalNeeded,
-      text: current ? `외부 CSV 기준 미분양 ${format(current.unsoldUnits)}호, 입주량 ${format(current.moveInUnits)}호를 시장 점수에 참고합니다.` : "미분양/입주량 CSV가 들어오면 공급 리스크를 함께 판단합니다.",
-      data: ["미분양", current ? `${format(current.unsoldUnits)}호` : "CSV 필요", "입주량", current ? `${format(current.moveInUnits)}호` : "CSV 필요", "반영 파일", current ? "market-indicators.csv 적용 완료" : "data/market-indicators.csv 필요"],
+      score: current ? `${supplyScore}점` : "CSV 필요",
+      text: current ? `외부 CSV 기준 미분양 ${format(current.unsoldUnits)}호, 입주량 ${format(current.moveInUnits)}호를 반영해 공급 부담 점수를 계산했습니다.` : "미분양/입주량 CSV가 들어오면 공급 리스크를 함께 판단합니다.",
+      data: ["미분양", current ? `${format(current.unsoldUnits)}호` : "CSV 필요", "입주량", current ? `${format(current.moveInUnits)}호` : "CSV 필요", "반영 결과", current ? supplyDecision(supplyScore) : "data/market-indicators.csv 필요"],
     },
     price: {
       title: "가격지수/가격흐름",
@@ -438,9 +440,9 @@ function renderFramework() {
     },
     pir: {
       title: "PIR/주택구입부담",
-      score: externalNeeded,
-      text: current ? `강릉시 가구소득 ${formatMoney(current.householdIncome)}은 이미 입력되어 있습니다. 이 값을 기준으로 선택 단지 구매부담을 보강합니다.` : "강릉시 가구소득 CSV가 들어오면 PIR/구매부담 판단이 활성화됩니다.",
-      data: ["가구소득", current ? formatMoney(current.householdIncome) : "CSV 필요", "현재 계산", "매매가/전세가율", "입력 상태", current ? "강릉시 가구소득 입력 완료" : "강릉시 가구소득 필요"],
+      score: affordability ? `${affordability.score}점` : "CSV 필요",
+      text: affordability ? `강릉시 가구소득 ${formatMoney(current.householdIncome)}과 ${affordability.scopeLabel} 평균 매매가 ${formatMoney(affordability.avgSale)}를 비교해 구매부담 점수를 계산했습니다.` : "강릉시 가구소득 CSV와 매매 실거래가 있으면 PIR/구매부담 점수가 표시됩니다.",
+      data: ["가구소득", current ? formatMoney(current.householdIncome) : "CSV 필요", "PIR", affordability ? `${formatNumber(affordability.pir, 1)}배` : "계산 부족", "반영 결과", affordability ? affordabilityDecision(affordability.score) : "강릉시 가구소득 필요"],
     },
     risk: {
       title: "신용/리스크",
@@ -893,6 +895,41 @@ function computeApartmentStats(aptRows, scopeRows) {
     jeonseRatioText: jeonseRatio ? `${formatNumber(jeonseRatio, 1)}%` : "데이터 부족",
     rentYieldText: rentYield ? `${formatNumber(rentYield, 2)}%` : "데이터 부족",
   };
+}
+
+function computeSupplyScore(indicator) {
+  if (!indicator) return null;
+  const unsoldPressure = clamp(Number(indicator.unsoldUnits || 0) / 1800 * 55, 0, 55);
+  const moveInPressure = clamp(Number(indicator.moveInUnits || 0) / 2500 * 35, 0, 35);
+  return clamp(Math.round(100 - unsoldPressure - moveInPressure), 0, 100);
+}
+
+function supplyDecision(score) {
+  if (score >= 70) return "공급 부담 낮음";
+  if (score >= 45) return "공급 부담 주의";
+  return "공급 부담 큼";
+}
+
+function computeAffordabilityScore(rows, indicator) {
+  if (!indicator?.householdIncome) return null;
+  const sources = [
+    { label: "선택 범위", rows },
+    { label: "현재 기간 강릉시", rows: state.periodRows },
+    { label: "강릉시 전체", rows: state.baseRows },
+  ];
+  const source = sources.find((item) => avg(item.rows.filter((row) => row.tradeType === "매매" && row.amount > 0).map((row) => row.amount)) > 0);
+  if (!source) return null;
+  const avgSale = avg(source.rows.filter((row) => row.tradeType === "매매" && row.amount > 0).map((row) => row.amount));
+  if (!avgSale) return null;
+  const pir = avgSale / Number(indicator.householdIncome);
+  const score = clamp(Math.round(100 - ((pir - 4) / 8 * 100)), 0, 100);
+  return { avgSale, pir, score, scopeLabel: source.label };
+}
+
+function affordabilityDecision(score) {
+  if (score >= 70) return "구매부담 낮음";
+  if (score >= 45) return "구매부담 보통";
+  return "구매부담 큼";
 }
 
 function renderExternalDataStatus() {
