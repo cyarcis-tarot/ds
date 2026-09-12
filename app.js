@@ -622,8 +622,10 @@ function osmEmbedSrc(lat, lng, span = 0.01) {
 
 function initMap(lat, lng, profile) {
   state.mapState = {
-    lat: Number(lat),
-    lng: Number(lng),
+    centerLat: Number(lat),
+    centerLng: Number(lng),
+    apartmentLat: Number(lat),
+    apartmentLng: Number(lng),
     zoom: 16,
     profile: profile || [],
     drag: null,
@@ -636,7 +638,7 @@ function renderMapTiles() {
   if (!map || !el.mapFrame) return;
   const width = Math.max(320, el.mapFrame.clientWidth || 640);
   const height = Math.max(260, el.mapFrame.clientHeight || 320);
-  const center = latLngToPixel(map.lat, map.lng, map.zoom);
+  const center = latLngToPixel(map.centerLat, map.centerLng, map.zoom);
   const startX = center.x - width / 2;
   const startY = center.y - height / 2;
   const tileSize = 256;
@@ -654,10 +656,14 @@ function renderMapTiles() {
       tiles.push(`<img class="map-tile" src="${API_ORIGIN}/api/map-tile?z=${map.zoom}&x=${wrappedX}&y=${y}" style="left:${Math.round(x * tileSize - startX)}px;top:${Math.round(y * tileSize - startY)}px" alt="">`);
     }
   }
+  const apartment = latLngToPixel(map.apartmentLat, map.apartmentLng, map.zoom);
+  const markerLeft = Math.round(apartment.x - startX);
+  const markerTop = Math.round(apartment.y - startY);
+  const isMarkerVisible = markerLeft > -120 && markerLeft < width + 120 && markerTop > -80 && markerTop < height + 80;
 
   el.mapFrame.innerHTML = `
     <div class="map-tile-layer">${tiles.join("")}</div>
-    <div class="map-center-pin"><span aria-hidden="true">🏢</span><strong>선택 아파트</strong></div>
+    <div class="map-apartment-pin${isMarkerVisible ? "" : " is-hidden"}" style="left:${markerLeft}px;top:${markerTop}px"><span aria-hidden="true">🏢</span><strong>선택 아파트</strong></div>
     <div class="map-attribution">VWorld 공간정보</div>
     <div class="map-zoom">
       <button type="button" data-map-zoom="1">+</button>
@@ -668,14 +674,14 @@ function renderMapTiles() {
   el.mapFrame.onpointerdown = (event) => {
     if (event.target.closest("button")) return;
     el.mapFrame.setPointerCapture(event.pointerId);
-    map.drag = { x: event.clientX, y: event.clientY, lat: map.lat, lng: map.lng };
+    map.drag = { x: event.clientX, y: event.clientY, lat: map.centerLat, lng: map.centerLng };
   };
   el.mapFrame.onpointermove = (event) => {
     if (!map.drag) return;
     const base = latLngToPixel(map.drag.lat, map.drag.lng, map.zoom);
     const next = pixelToLatLng(base.x - (event.clientX - map.drag.x), base.y - (event.clientY - map.drag.y), map.zoom);
-    map.lat = next.lat;
-    map.lng = next.lng;
+    map.centerLat = next.lat;
+    map.centerLng = next.lng;
     renderMapTiles();
   };
   el.mapFrame.onpointerup = () => { map.drag = null; };

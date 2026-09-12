@@ -796,10 +796,8 @@ canvas {
   height: 256px;
 }
 
-.map-center-pin {
+.map-apartment-pin {
   position: absolute;
-  left: 50%;
-  top: 50%;
   z-index: 5;
   display: inline-flex;
   align-items: center;
@@ -814,9 +812,15 @@ canvas {
   font-size: 15px;
   font-weight: 950;
   white-space: nowrap;
+  pointer-events: none;
+  will-change: left, top;
 }
 
-.map-center-pin span {
+.map-apartment-pin.is-hidden {
+  display: none;
+}
+
+.map-apartment-pin span {
   font-size: 21px;
   line-height: 1;
 }
