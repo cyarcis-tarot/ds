@@ -992,7 +992,7 @@ function renderProjectionEconomy(apt, years, external, economic, economyBias) {
       <div>
         <p class="eyebrow">강릉시 경제분석 반영</p>
         <h3>${escapeHtml(direction)}</h3>
-        <p>${escapeHtml(apt)} 전망은 선택 단지 실거래 흐름에 강릉시 경제지표 동향 브리프를 함께 적용했습니다. ${escapeHtml(horizon)} ${escapeHtml(pressureText)}</p>
+        <p>${escapeHtml(apt)} 전망은 선호 아파트 실거래 흐름에 강릉시 경제지표 동향 브리프를 함께 적용했습니다. ${escapeHtml(horizon)} ${escapeHtml(pressureText)}</p>
       </div>
       <div class="economy-chips">
         <span>산업단지 고용 ${format(economic.industrialEmployment)}명 · 6개월 ${formatSigned(economic.industrialEmploymentChange6m)}명</span>
