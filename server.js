@@ -461,9 +461,15 @@ async function handleMapTile(url, res) {
   }
 
   const buffer = Buffer.from(await response.arrayBuffer());
+  const contentType = response.headers.get("content-type") || "";
+  if (!contentType.startsWith("image/")) {
+    sendJson(res, 502, { error: "VWorld 지도 이미지가 아닌 응답을 받았습니다.", layer });
+    return;
+  }
+
   res.writeHead(200, {
     ...corsHeaders(),
-    "content-type": response.headers.get("content-type") || "image/png",
+    "content-type": contentType,
     "cache-control": "public, max-age=86400",
   });
   res.end(buffer);

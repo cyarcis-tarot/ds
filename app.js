@@ -80,6 +80,7 @@ const colors = {
 };
 
 const API_ORIGIN = window.location.protocol === "file:" ? "http://localhost:5177" : "";
+const MAP_TILE_VERSION = "20260912-aerial3";
 const FETCH_MONTHS = 24;
 const ANALYSIS_MONTHS = 12;
 const PERIOD_LABELS = {
@@ -657,8 +658,8 @@ function renderMapTiles() {
       const wrappedX = ((x % maxTile) + maxTile) % maxTile;
       const left = Math.round(x * tileSize - startX);
       const top = Math.round(y * tileSize - startY);
-      tiles.push(`<img class="map-tile" src="${API_ORIGIN}/api/map-tile?layer=Satellite&z=${map.zoom}&x=${wrappedX}&y=${y}" style="left:${left}px;top:${top}px" alt="">`);
-      tiles.push(`<img class="map-tile map-tile-labels" src="${API_ORIGIN}/api/map-tile?layer=Hybrid&z=${map.zoom}&x=${wrappedX}&y=${y}" style="left:${left}px;top:${top}px" alt="">`);
+      tiles.push(`<img class="map-tile" src="${API_ORIGIN}/api/map-tile?layer=Satellite&z=${map.zoom}&x=${wrappedX}&y=${y}&v=${MAP_TILE_VERSION}" style="left:${left}px;top:${top}px" alt="" onerror="this.style.display='none'">`);
+      tiles.push(`<img class="map-tile map-tile-labels" src="${API_ORIGIN}/api/map-tile?layer=Hybrid&z=${map.zoom}&x=${wrappedX}&y=${y}&v=${MAP_TILE_VERSION}" style="left:${left}px;top:${top}px" alt="" onerror="this.style.display='none'">`);
     }
   }
   const apartment = latLngToPixel(map.apartmentLat, map.apartmentLng, map.zoom);
