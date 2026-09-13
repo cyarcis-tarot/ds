@@ -144,7 +144,7 @@ async function loadData() {
   try {
     const health = await getApiHealth();
     if (requestId !== state.loadRequestId) return;
-    const missing = getMissingProviders(health);
+    const missing = getMissingTransactionProviders(health);
     if (missing.length) {
       throw new Error(`${missing.join(", ")} API 키가 설정되지 않았습니다.`);
     }
@@ -170,7 +170,17 @@ async function loadData() {
     const runHint = window.location.protocol === "file:" ? " run-dashboard.bat으로 실행하면 실제 공공데이터가 표시됩니다." : "";
     setStatus(`실제 데이터를 불러오지 못했습니다: ${error.message}.${runHint}`);
     updateSourceStatus("transactions", "error", new Date().toISOString(), error.message);
+    await loadExternalData();
+    useSampleData(error.message, runHint);
   }
+}
+
+function useSampleData(reason, runHint = "") {
+  state.isSample = true;
+  state.rows = demoRows();
+  hydrateFilters();
+  render();
+  setStatus(`실제 데이터를 불러오지 못해 샘플 데이터를 표시합니다: ${reason}.${runHint}`);
 }
 
 function useTransactionData(data, fromCache) {
@@ -242,11 +252,9 @@ function renderSourceStatus() {
   }).join("");
 }
 
-function getMissingProviders(health) {
-  const providers = health?.providers || {};
-  return Object.values(providers)
-    .filter((provider) => !provider.configured)
-    .map((provider) => provider.name || "외부");
+function getMissingTransactionProviders(health) {
+  const transactionProvider = health?.providers?.transactions;
+  return transactionProvider?.configured ? [] : [transactionProvider?.name || "국토교통부 실거래가"];
 }
 
 function providerSummary(health) {

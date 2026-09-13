@@ -3,7 +3,10 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $port = 5177
 $logFile = Join-Path $root "dashboard.log"
-$bundledNode = Join-Path $root "dist\Gangneung_Dashboard_Portable\node.exe"
+$bundledNodeCandidates = @(
+  (Join-Path $root "node.exe"),
+  (Join-Path $root "dist\Gangneung_Dashboard_Portable\node.exe")
+)
 $server = Join-Path $root "server.js"
 
 "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] Starting Gangneung PropTech Dashboard" | Set-Content -LiteralPath $logFile -Encoding UTF8
@@ -13,7 +16,8 @@ if (-not (Test-Path -LiteralPath $server)) {
   throw "server.js 파일을 찾을 수 없습니다."
 }
 
-if (Test-Path -LiteralPath $bundledNode) {
+$bundledNode = $bundledNodeCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+if ($bundledNode) {
   $node = $bundledNode
 } else {
   $cmd = Get-Command node -ErrorAction SilentlyContinue

@@ -349,7 +349,10 @@ async function handleExternalIndicators(res) {
     return;
   }
 
-  const csvPath = path.join(ROOT, "data", "market-indicators.csv");
+  const csvPath = firstExistingPath([
+    path.join(ROOT, "data", "market-indicators.csv"),
+    path.join(ROOT, "market-indicators.csv"),
+  ]);
   if (!fs.existsSync(csvPath)) {
     const payload = {
       configured: false,
@@ -376,7 +379,10 @@ async function handleExternalIndicators(res) {
     source: tidy(row.source),
   })).filter((row) => Number.isFinite(row.year));
 
-  const economicPath = path.join(ROOT, "data", "economic-indicators.csv");
+  const economicPath = firstExistingPath([
+    path.join(ROOT, "data", "economic-indicators.csv"),
+    path.join(ROOT, "economic-indicators.csv"),
+  ]);
   const economicRows = fs.existsSync(economicPath)
     ? parseCsv(fs.readFileSync(economicPath, "utf8")).map(normalizeEconomicIndicator)
     : [];
@@ -714,6 +720,10 @@ function serveStatic(requestPath, res) {
     res.writeHead(200, { "content-type": MIME[path.extname(filePath)] || "application/octet-stream" });
     res.end(data);
   });
+}
+
+function firstExistingPath(paths) {
+  return paths.find((candidate) => fs.existsSync(candidate)) || paths[0];
 }
 
 function loadEnv() {

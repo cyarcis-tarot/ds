@@ -5,6 +5,9 @@ $dist = Join-Path $root "dist"
 $workspacePackage = Join-Path $dist "package"
 $portable = Join-Path $dist "Gangneung_Dashboard_Portable"
 $exePath = Join-Path $dist "Gangneung_Apartment_Dashboard_Distribution.exe"
+$koreanExeName = -join ([int[]](44053,47497,49884,95,50500,54028,53944,95,45824,49884,48372,46300,95,48176,54252,50857,46,101,120,101) | ForEach-Object { [char]$_ })
+$koreanExePath = Join-Path $root $koreanExeName
+$zipPath = Join-Path $dist "Gangneung_Dashboard_Portable.zip"
 $buildBase = Join-Path $env:PUBLIC "Documents\ESTsoft\CreatorTemp\gangneung-dashboard-build"
 $package = Join-Path $buildBase "package"
 $asciiExePath = Join-Path $buildBase "GangneungApartmentDashboard.exe"
@@ -22,6 +25,7 @@ New-Item -ItemType Directory -Force -Path $portable | Out-Null
 
 $files = @(
   "server.js",
+  "dashboard.html",
   "index.html",
   "styles.css",
   "app.js",
@@ -37,6 +41,23 @@ foreach ($file in $files) {
   Copy-Item -LiteralPath (Join-Path $root $file) -Destination (Join-Path $package $file) -Force
   Copy-Item -LiteralPath (Join-Path $root $file) -Destination (Join-Path $workspacePackage $file) -Force
   Copy-Item -LiteralPath (Join-Path $root $file) -Destination (Join-Path $portable $file) -Force
+}
+
+$dataSource = Join-Path $root "data"
+if (Test-Path -LiteralPath $dataSource) {
+  foreach ($target in @($package, $workspacePackage, $portable)) {
+    $dataTarget = Join-Path $target "data"
+    if (Test-Path -LiteralPath $dataTarget) {
+      Remove-Item -LiteralPath $dataTarget -Recurse -Force
+    }
+    Copy-Item -LiteralPath $dataSource -Destination $dataTarget -Recurse -Force
+  }
+  foreach ($indicatorFile in @("market-indicators.csv", "economic-indicators.csv")) {
+    $indicatorPath = Join-Path $dataSource $indicatorFile
+    if (Test-Path -LiteralPath $indicatorPath) {
+      Copy-Item -LiteralPath $indicatorPath -Destination (Join-Path $package $indicatorFile) -Force
+    }
+  }
 }
 
 Copy-Item -LiteralPath $nodePath -Destination (Join-Path $package "node.exe") -Force
@@ -115,20 +136,26 @@ SourceFiles0=$package
 %FILE10%=
 %FILE11%=
 %FILE12%=
+%FILE13%=
+%FILE14%=
+%FILE15%=
 [Strings]
 FILE0="server.js"
-FILE1="index.html"
-FILE2="styles.css"
-FILE3="app.js"
-FILE4=".env"
-FILE5=".env.example"
-FILE6=".gitignore"
-FILE7="PROJECT_CONTEXT.md"
-FILE8="launch-dashboard.ps1"
-FILE9="README.md"
-FILE10="node.exe"
-FILE11="launch-dashboard.bat"
-FILE12="Gangneung_Apartment_Dashboard.exe"
+FILE1="dashboard.html"
+FILE2="index.html"
+FILE3="styles.css"
+FILE4="app.js"
+FILE5=".env"
+FILE6=".env.example"
+FILE7=".gitignore"
+FILE8="PROJECT_CONTEXT.md"
+FILE9="launch-dashboard.ps1"
+FILE10="README.md"
+FILE11="node.exe"
+FILE12="launch-dashboard.bat"
+FILE13="Gangneung_Apartment_Dashboard.exe"
+FILE14="market-indicators.csv"
+FILE15="economic-indicators.csv"
 "@
 
 Set-Content -LiteralPath $sedPath -Value $sed -Encoding ASCII
@@ -166,7 +193,15 @@ if (-not (Test-Path $asciiExePath) -or (Get-Item $asciiExePath).Length -le 10485
 }
 
 Copy-Item -LiteralPath $asciiExePath -Destination $exePath -Force
+Copy-Item -LiteralPath $asciiExePath -Destination $koreanExePath -Force
+
+if (Test-Path -LiteralPath $zipPath) {
+  Remove-Item -LiteralPath $zipPath -Force
+}
+Compress-Archive -LiteralPath $portable -DestinationPath $zipPath -Force
 
 Write-Host "Created: $exePath"
+Write-Host "Created: $koreanExePath"
+Write-Host "Portable zip: $zipPath"
 Write-Host "Portable launcher: $launcherPath"
 Write-Host "Portable package folder: $workspacePackage"
