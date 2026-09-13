@@ -80,7 +80,8 @@ const colors = {
 };
 
 const API_ORIGIN = window.location.protocol === "file:" ? "http://localhost:5177" : "";
-const MAP_TILE_VERSION = "20260912-aerial3";
+const IS_PUBLIC_STATIC_PAGE = /github\.io$/i.test(window.location.hostname);
+const MAP_TILE_VERSION = "20260913-mapfallback";
 const FETCH_MONTHS = 24;
 const ANALYSIS_MONTHS = 12;
 const PERIOD_LABELS = {
@@ -666,8 +667,12 @@ function renderMapTiles() {
       const wrappedX = ((x % maxTile) + maxTile) % maxTile;
       const left = Math.round(x * tileSize - startX);
       const top = Math.round(y * tileSize - startY);
-      tiles.push(`<img class="map-tile" src="${API_ORIGIN}/api/map-tile?layer=Satellite&z=${map.zoom}&x=${wrappedX}&y=${y}&v=${MAP_TILE_VERSION}" style="left:${left}px;top:${top}px" alt="" onerror="this.style.display='none'">`);
-      tiles.push(`<img class="map-tile map-tile-labels" src="${API_ORIGIN}/api/map-tile?layer=Hybrid&z=${map.zoom}&x=${wrappedX}&y=${y}&v=${MAP_TILE_VERSION}" style="left:${left}px;top:${top}px" alt="" onerror="this.style.display='none'">`);
+      if (IS_PUBLIC_STATIC_PAGE) {
+        tiles.push(`<img class="map-tile" src="https://tile.openstreetmap.org/${map.zoom}/${wrappedX}/${y}.png" style="left:${left}px;top:${top}px" alt="" onerror="this.style.display='none'">`);
+      } else {
+        tiles.push(`<img class="map-tile" src="${API_ORIGIN}/api/map-tile?layer=Satellite&z=${map.zoom}&x=${wrappedX}&y=${y}&v=${MAP_TILE_VERSION}" style="left:${left}px;top:${top}px" alt="" onerror="this.style.display='none'">`);
+        tiles.push(`<img class="map-tile map-tile-labels" src="${API_ORIGIN}/api/map-tile?layer=Hybrid&z=${map.zoom}&x=${wrappedX}&y=${y}&v=${MAP_TILE_VERSION}" style="left:${left}px;top:${top}px" alt="" onerror="this.style.display='none'">`);
+      }
     }
   }
   const apartment = latLngToPixel(map.apartmentLat, map.apartmentLng, map.zoom);
@@ -678,7 +683,7 @@ function renderMapTiles() {
   el.mapFrame.innerHTML = `
     <div class="map-tile-layer">${tiles.join("")}</div>
     <div class="map-apartment-pin${isMarkerVisible ? "" : " is-hidden"}" style="left:${markerLeft}px;top:${markerTop}px" title="선택 아파트" aria-label="선택 아파트"></div>
-    <div class="map-attribution">VWorld 항공지도</div>
+    <div class="map-attribution">${IS_PUBLIC_STATIC_PAGE ? "공개 지도" : "VWorld 항공지도"}</div>
     <div class="map-zoom">
       <button type="button" data-map-zoom="1">+</button>
       <button type="button" data-map-zoom="-1">-</button>
